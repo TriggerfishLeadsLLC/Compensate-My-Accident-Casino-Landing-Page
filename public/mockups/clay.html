@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Direction 4 — Soft Clay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--sky:#4cc3ff;--coral:#ff7a6b;--mint:#3fd6a0;--yellow:#ffce3a;--ink:#243a5e}
+*{box-sizing:border-box}
+body{margin:0;font-family:Fredoka,system-ui,sans-serif;color:var(--ink);min-height:100vh;background:#e9f2ff;
+background-image:radial-gradient(50% 40% at 15% 5%,rgba(76,195,255,.3),transparent 60%),radial-gradient(50% 40% at 90% 8%,rgba(255,122,107,.22),transparent 60%)}
+.wrap{max-width:500px;margin:0 auto;padding:28px 18px 60px;text-align:center}
+.eyebrow{display:inline-block;font-weight:700;font-size:13px;color:#fff;background:var(--sky);padding:6px 14px;border-radius:99px;box-shadow:0 4px 0 #2a9fd6}
+h1{font-weight:700;font-size:clamp(30px,8.5vw,46px);line-height:1.05;margin:14px 0 6px;color:var(--ink)}
+.sub0{color:#5c7095;font-size:16px;margin:0 0 18px;max-width:28ch;margin-inline:auto}
+.score-card{margin:8px 0 24px;padding:26px 22px;border-radius:28px;background:#fff;box-shadow:0 12px 0 #cfe0f5,0 22px 40px -22px rgba(40,80,140,.4)}
+.score-label{font-weight:700;font-size:13px;color:#8aa0c0;text-transform:uppercase;letter-spacing:.04em}
+.score{font-weight:700;font-size:clamp(50px,16vw,76px);line-height:1;margin:4px 0 14px;color:var(--coral)}
+.bar{height:14px;border-radius:99px;background:#e7eefb;overflow:hidden}
+.bar>i{display:block;height:100%;width:14%;border-radius:99px;background:var(--mint)}
+.q{font-weight:700;font-size:clamp(22px,6vw,29px);margin:22px 0 4px}
+.sub{color:#5c7095;margin:0 0 18px;font-size:15px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tile{display:flex;align-items:center;gap:12px;padding:18px 16px;border-radius:20px;font-weight:700;font-size:17px;text-align:left;color:#fff}
+.tile .ic{font-size:24px}
+.t1{background:var(--sky);box-shadow:0 6px 0 #2a9fd6}
+.t2{background:var(--coral);box-shadow:0 6px 0 #d65141}
+.t3{background:var(--mint);box-shadow:0 6px 0 #1fae7e}
+.t4{background:#9b8cff;box-shadow:0 6px 0 #6f5de0}
+.t5{background:var(--yellow);color:#5a4500;box-shadow:0 6px 0 #d6a800}
+.t6{background:#56c2c9;box-shadow:0 6px 0 #2f9aa1}
+.cta{margin-top:26px;width:100%;padding:18px;border:none;border-radius:20px;font-family:inherit;font-weight:700;font-size:19px;color:#fff;background:var(--mint);box-shadow:0 7px 0 #1fae7e}
+.tag{position:fixed;top:10px;left:10px;font-size:10px;letter-spacing:.1em;color:#5c7095;background:#fff;padding:5px 10px;border-radius:8px;box-shadow:0 3px 0 #cfe0f5}
+</style></head><body>
+<div class="tag">DIRECTION 4 · SOFT CLAY</div>
+<div class="wrap">
+<div class="eyebrow">✦ AI Claim Calculator</div>
+<h1>What's your claim worth?</h1>
+<p class="sub0">Answer a few quick questions and watch it add up!</p>
+<div class="score-card"><div class="score-label">Estimated case value</div><div class="score">$0</div><div class="bar"><i></i></div></div>
+<div class="q">What type of accident?</div>
+<p class="sub">Tap one to start</p>
+<div class="tiles">
+<div class="tile t1"><span class="ic">🚗</span>Car</div>
+<div class="tile t2"><span class="ic">🏍️</span>Motorcycle</div>
+<div class="tile t3"><span class="ic">🚚</span>Truck</div>
+<div class="tile t4"><span class="ic">🚶</span>Pedestrian</div>
+<div class="tile t5"><span class="ic">🚲</span>Bicycle</div>
+<div class="tile t6"><span class="ic">👷</span>At work</div>
+</div>
+</div></body></html>
