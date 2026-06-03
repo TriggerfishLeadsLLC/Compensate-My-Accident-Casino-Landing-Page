@@ -83,6 +83,17 @@ export function resize() {
   if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
+// Pre-warm during idle (HIGH model): allocate the canvas + build sprites + force the
+// one-time sprite GPU upload (off-screen draw, then clear) so the FIRST real coin burst
+// (e.g. the first tap) is smooth instead of paying cold-start costs mid-animation.
+export function warmUp() {
+  ensureReady();
+  if (!ctx || !coinSprite || !sparkSprite) return;
+  ctx.drawImage(coinSprite, -200, -200);
+  ctx.drawImage(sparkSprite, -200, -200);
+  ctx.clearRect(0, 0, W, H);
+}
+
 function loop() {
   if (!ctx) { running = false; return; }
   ctx.clearRect(0, 0, W, H);

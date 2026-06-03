@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STEPS, US_STATES, type Answers } from "@/lib/funnel";
 import { estimateRange, teaserValue, fmtUSD, valueModel } from "@/lib/estimate";
 import { track, trackLead, clarityTag } from "@/lib/analytics";
-import { coinBurst, shower } from "@/lib/fx";
+import { coinBurst, shower, warmUp } from "@/lib/fx";
 import AccidentIcon from "@/components/AccidentIcon";
 import ValueHUD from "@/components/ValueHUD";
 import SocialProof from "@/components/SocialProof";
@@ -128,32 +128,24 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   useEffect(() => {
     if (!v2) return;
     if (valueModel() !== "high") return; // light model: start at $0, no auto-teaser
-    // PERF (first-load smoothness): wait until the main thread is IDLE before playing
-    // the intro count-up + coins. Firing on mount made the canvas animation fight
-    // hydration + the first burst of 3rd-party tags (FB/Hyros/GTM/AppLovin) for the
-    // thread → janky coins on the very first load. requestIdleCallback fires once that
-    // burst settles, so the intro is buttery (the rest of the funnel already was).
-    let burstId: number | undefined;
+    // The on-load auto-teaser is JUST the value counting up (cheap, smooth) — NO coin
+    // burst on load. A canvas burst firing during/just-after first paint, on a cold
+    // canvas, was the source of the first-load jitter, and it's pure flair (coins still
+    // fire on every tap). During idle we also pre-warm the FX engine (allocate the
+    // canvas + upload the sprites) so the FIRST tap's coins are buttery too.
     const w = window as unknown as {
       requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
       cancelIdleCallback?: (id: number) => void;
     };
     const playIntro = () => {
+      try { warmUp(); } catch { /* flair only */ }
       climbTo(9000);
-      burstId = window.setTimeout(() => {
-        try {
-          const el = document.getElementById("cma-value");
-          const r = el?.getBoundingClientRect();
-          coinBurst({ fromX: window.innerWidth / 2, fromY: window.innerHeight * 0.66, toX: r ? r.left + r.width / 2 : window.innerWidth / 2, toY: r ? r.top + r.height / 2 : 120, count: 12 });
-        } catch { /* flair only */ }
-      }, 120);
     };
     const idleId = w.requestIdleCallback ? w.requestIdleCallback(playIntro, { timeout: 1500 }) : undefined;
     const fallback = w.requestIdleCallback ? undefined : window.setTimeout(playIntro, 1100); // iOS Safari (no rIC)
     return () => {
       if (idleId !== undefined) { try { w.cancelIdleCallback?.(idleId); } catch {} }
       if (fallback !== undefined) window.clearTimeout(fallback);
-      if (burstId !== undefined) window.clearTimeout(burstId);
     };
   }, [v2]); // eslint-disable-line react-hooks/exhaustive-deps
 
