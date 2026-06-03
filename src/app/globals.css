@@ -254,3 +254,58 @@ html.lite .hud-value,html.lite .reveal-est-value{filter:none}
   .fnl-btn,.fnl-field,.hud-value.punch,.combat,.reveal-card,.fnl.shake,.fnl-tcpa.miss,.typrog-bar span,.reveal-livedot,.tyhold-dot{animation:none!important}
   .hud-prog>span{transition:none}
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   SHORT-VIEWPORT POLISH. Budget phones (~360×640), small phones (iPhone SE
+   ~375×667) and 7" tablets (e.g. the ZTE, ~400×620 CSS) are WIDE-but-SHORT:
+   the hero → value → trust → ticker stack pushed the first question (and all
+   answer tiles) below the fold. Tall modern phones (>740 tall) are untouched.
+   Here we tighten vertical rhythm only — tap targets and the value hook stay
+   big — so the question and first answer row clear the fold on short screens.
+   Height-keyed and placed last, so it overrides the spacing set above.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-height:740px){
+  .center{padding-top:0}
+  .topbar{padding-top:9px}
+  .hero{padding:7px 18px 0}
+  .eyebrow{font-size:11px;letter-spacing:.18em}
+  .hero h1{font-size:clamp(22px,6vw,30px);line-height:1.07;margin-top:5px}
+  .hud{padding:13px 18px 12px}
+  .hud-row{gap:8px}
+  .hud-valrow{margin:4px 0 7px}
+  .hud-value{font-size:clamp(40px,11.5vw,54px)}
+  .hud-range{font-size:13.5px;margin-bottom:7px;min-height:0}
+  .hud-urgency{margin:-2px 0 7px}
+  .hud-prog{height:7px}
+  .hud-step{margin-top:6px}
+  .trust{margin:9px auto 0;padding:10px 15px;gap:6px}
+  .av .face{width:36px;height:36px;margin-left:-11px}
+  .ticker{margin:8px auto 0}
+  .fnl-step{padding:9px 0 8px}
+  .fnl-h{margin:2px 0 6px}
+  .fnl-sub{margin:0 0 8px}
+  .fnl-grid{gap:9px}
+  .fnl-btn{min-height:60px}
+}
+/* Small phones / 7" tablets (≤700: iPhone SE, budget Androids ~640, the ZTE
+   ~620): claw back a little more — from gaps/dead space, not the value hook or
+   tap targets — and drop the redundant eyebrow so the question and first answer
+   row clear the fold even with the browser toolbar showing. */
+@media (max-height:700px){
+  .eyebrow{display:none} /* H1 already carries the message; reclaim the line on tiny screens */
+  .hero{padding-top:6px}
+  .hero h1{font-size:clamp(21px,5.6vw,27px);margin-top:0}
+  .hud{padding:11px 16px 10px}
+  .hud-label{font-size:11px}
+  .hud-valrow{margin:3px 0 6px}
+  .hud-value{font-size:clamp(37px,10.5vw,50px)}
+  .hud-range{font-size:13px;margin-bottom:6px}
+  .trust{margin:7px auto 0;padding:9px 13px}
+  .trust-stats{font-size:14px}
+  .trust-bot{font-size:13px}
+  .ticker{margin:6px auto 0}
+  .fnl-step{padding:6px 0 6px}
+  .fnl-sub{margin:0 0 7px}
+  .fnl-grid{gap:8px}
+  .fnl-btn{min-height:56px}
+}
