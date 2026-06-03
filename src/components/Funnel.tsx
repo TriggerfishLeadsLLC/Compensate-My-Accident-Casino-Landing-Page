@@ -128,31 +128,22 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   useEffect(() => {
     if (!v2) return;
     if (valueModel() !== "high") return; // light model: start at $0, no auto-teaser
-    // On-load auto-teaser: value count-up + coin burst, but DELAYED ~0.5s so the tracking
-    // pixels (which fire on load) get a head start first. Crucially, we PRE-WARM the
-    // canvas during the gap (warmUp on an early idle: allocate + upload the sprites), so
-    // when the burst fires at +0.5s it lands on a WARM canvas — that (not the timing) is
-    // what kills the first-burst jitter. Coins also fire on every tap (already warm).
-    const w = window as unknown as {
-      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    // Pre-warm the FX engine during an early idle gap (before the burst).
-    const warmId = w.requestIdleCallback ? w.requestIdleCallback(() => { try { warmUp(); } catch {} }, { timeout: 300 }) : undefined;
-    if (warmId === undefined) window.setTimeout(() => { try { warmUp(); } catch {} }, 80); // iOS fallback
-    const introTO = window.setTimeout(() => {
-      try { warmUp(); } catch {} // idempotent safety if the idle pre-warm hasn't run yet
-      climbTo(9000);
+    // On-load auto-teaser (original behavior): the value count-up starts immediately and
+    // the coin burst fires right after — the strong hook Kaleb wants on load. Optimized
+    // as much as we can without changing that: warmUp() (runs post-paint, since effects
+    // fire after paint) allocates the canvas + uploads the sprites up front so the burst
+    // isn't cold; the count-up is decoupled from React; DPR is capped. A touch of
+    // first-load lag on a weak device is accepted. Coins also fire on every tap.
+    try { warmUp(); } catch { /* flair only */ }
+    climbTo(9000);
+    const ct = window.setTimeout(() => {
       try {
         const el = document.getElementById("cma-value");
         const r = el?.getBoundingClientRect();
-        coinBurst({ fromX: window.innerWidth / 2, fromY: window.innerHeight * 0.66, toX: r ? r.left + r.width / 2 : window.innerWidth / 2, toY: r ? r.top + r.height / 2 : 120, count: 12 });
+        coinBurst({ fromX: window.innerWidth / 2, fromY: window.innerHeight * 0.66, toX: r ? r.left + r.width / 2 : window.innerWidth / 2, toY: r ? r.top + r.height / 2 : 120, count: 14 });
       } catch { /* flair only */ }
-    }, 500);
-    return () => {
-      if (warmId !== undefined && w.cancelIdleCallback) { try { w.cancelIdleCallback(warmId); } catch {} }
-      window.clearTimeout(introTO);
-    };
+    }, 150);
+    return () => window.clearTimeout(ct);
   }, [v2]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = useCallback((key: string, value: string) => { setAns((a) => ({ ...a, [key]: value })); setErr(""); }, []);
