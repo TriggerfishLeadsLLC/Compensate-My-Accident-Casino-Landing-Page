@@ -22,6 +22,11 @@ export function buildMakePayload(a: Answers, meta: LeadMeta) {
   const u = meta.utms ?? {};
   const f = (type: string, label: string, step: string | number, value: unknown): Field => ({ type, label, step, value });
 
+  // Normalize phone → "1" + 10-digit local, tolerating autofill that already prepends
+  // the country code (so "+1 512…" / "1512…" don't become a double "11512…").
+  const pd = String(a.phone ?? "").replace(/\D/g, "");
+  const phone1 = "1" + (pd.length === 11 && pd.startsWith("1") ? pd.slice(1) : pd);
+
   const fields: Record<string, Field> = {
     buttons_485431231808561: f("Buttons", "Type of service", "acd45227cac332d443c4e1db", a.serviceType),
     buttons_622258029765821: f("Buttons", "Attorney", "aca684778b030842fae3851e", a.attorney),
@@ -35,7 +40,7 @@ export function buildMakePayload(a: Answers, meta: LeadMeta) {
     text_921418548778799: f("Text", "First name", "a3521f07443c3a05b36140a5", a.firstName),
     text_168309131262000: f("Text", "Last name", "a3521f07443c3a05b36140a5", a.lastName),
     email_213868147356228: f("Email", "What is your email address?", "fe5ec8504219f1b6c4e59be5", a.email),
-    phone_400747347981930: f("Phone", "What is your phone number?", "1d50fdecb868a4b4b6fa9ead", "1" + String(a.phone ?? "").replace(/\D/g, "")),
+    phone_400747347981930: f("Phone", "What is your phone number?", "1d50fdecb868a4b4b6fa9ead", phone1),
     toscheckbox_687262995170288: f("TOSCheckbox", "TOS", "1d50fdecb868a4b4b6fa9ead", "true"),
     hidden_978002841632858: f("Hidden", "", "acd45227cac332d443c4e1db", u.utm_source ?? ""),
     hidden_953875108661844: f("Hidden", "", "acd45227cac332d443c4e1db", u.utm_medium ?? ""),

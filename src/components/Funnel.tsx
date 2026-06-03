@@ -12,6 +12,9 @@ import Ticker from "@/components/Ticker";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const digits = (s: string) => s.replace(/\D/g, "");
+// US phone, tolerant of autofill/keyboards that prepend the "1" country code:
+// returns the 10-digit local number (strips a leading 1 from an 11-digit input).
+const localPhone = (s: string) => { const d = digits(s); return d.length === 11 && d.startsWith("1") ? d.slice(1) : d; };
 const haptic = (p: number | number[] = 12) => {
   try { (navigator as { vibrate?: (x: number | number[]) => void }).vibrate?.(p); } catch {}
 };
@@ -184,7 +187,7 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       case "name": return ans.firstName?.trim() && ans.lastName?.trim() ? "" : "Please enter your first and last name.";
       case "phone":
         if (contactPhase === "email") return EMAIL_RE.test(ans.email ?? "") ? "" : "Enter a valid email address.";
-        if (digits(ans.phone ?? "").length !== 10) return "Enter a valid 10-digit phone number.";
+        if (localPhone(ans.phone ?? "").length !== 10) return "Enter a valid 10-digit phone number.";
         if (!tcpa) return "Please check the box to agree and unlock your estimate.";
         return "";
       default: return "";
@@ -285,7 +288,7 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       // Consent missing (phone is valid but the box isn't checked) → spotlight the
       // checkbox: highlight + shake + error haptic + scroll into view, so an older
       // user clearly sees exactly what's blocking them.
-      if (step.kind === "phone" && contactPhase === "phone" && !tcpa && digits(ans.phone ?? "").length === 10) {
+      if (step.kind === "phone" && contactPhase === "phone" && !tcpa && localPhone(ans.phone ?? "").length === 10) {
         setTcpaMiss(true);
         haptic([0, 45, 55, 45]);
         try { document.getElementById("tcpa")?.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
@@ -303,7 +306,7 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
     if (step.kind === "phone" && contactPhase === "phone") {
       setBusy(true);
       try {
-        const r = await fetch("/api/enrich", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: ans.phone }) });
+        const r = await fetch("/api/enrich", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: localPhone(ans.phone ?? "") }) });
         const d = await r.json();
         setBusy(false);
         if (d?.email) { setAns((a) => ({ ...a, email: d.email })); await doSubmit(); return; }
