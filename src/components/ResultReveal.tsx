@@ -11,16 +11,17 @@ type Kind = "qualified" | "dv" | "other";
 
 const COPY: Record<Kind, { badge?: string; h1: string; sub: string }> = {
   qualified: {
-    badge: "You may pre-qualify",
+    badge: "You pre-qualify",
     h1: "You're all set!",
     sub: "Your accident may be eligible for compensation. Here's what happens now.",
   },
   dv: {
-    badge: "You may be owed money",
+    badge: "You may pre-qualify",
     h1: "You're all set!",
     sub: "Even without injuries, a crash usually lowers your car's value — a specialist will call you shortly to help you recover it.",
   },
   other: {
+    badge: "You may pre-qualify",
     h1: "Thanks — we've got your details.",
     sub: "A specialist will review your information and reach out if we can help.",
   },
@@ -66,6 +67,13 @@ export default function ResultReveal({ kind }: { kind: Kind }) {
   const showEstimate = revealed && est && kind !== "other";
   const rich = kind !== "other";
   const timer = `${Math.floor(secsLeft / 60)}:${String(secsLeft % 60).padStart(2, "0")}`;
+  // Front-loaded "almost there" progress: fast off the start (~4%/min for the first
+  // 5 min, 70→90), then slow (~1%/min for the last 5 min, 90→95). Caps at 95 — it
+  // never visibly "completes" (the real completion is the phone call). Crawls live
+  // as they sit on the page, so they feel progress is being made for them.
+  const elapsed = 600 - secsLeft; // seconds on the page since reveal
+  const progRaw = elapsed <= 300 ? 70 + (elapsed / 60) * 4 : 90 + ((elapsed - 300) / 60) * 1;
+  const prog = Math.min(95, progRaw);
 
   return (
     <>
@@ -95,9 +103,9 @@ export default function ResultReveal({ kind }: { kind: Kind }) {
               <p className="reveal-sub">We&apos;re matching you with a top-rated attorney for your case right now.</p>
 
               <section className="typrog">
-                <div className="typrog-top"><b>You&apos;re almost there</b><span>80%</span></div>
-                <div className="typrog-bar"><span /></div>
-                <div className="typrog-cap">Filling out your details was the hard part — one quick call completes your claim.</div>
+                <div className="typrog-top"><b>You&apos;re almost there</b><span>{Math.round(prog)}%</span></div>
+                <div className="typrog-bar"><span style={{ width: `${prog.toFixed(2)}%` }} /></div>
+                <div className="typrog-cap">Your estimate is ready below — but it&apos;s the quick call coming up that actually gets your claim started.</div>
               </section>
             </>
           ) : (
@@ -142,21 +150,24 @@ export default function ResultReveal({ kind }: { kind: Kind }) {
               </section>
 
               <section className="callout">
-                <span className="callout-ico" aria-hidden="true">📞</span>
+                <span className="callout-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                </span>
                 <div><b>Answer your phone.</b> Your specialist may call from a local or unfamiliar number — pick up so you don&apos;t lose your spot.</div>
               </section>
             </>
           )}
-
-          <p className="reveal-disclaimer">
-            This estimate is illustrative only — an &quot;up to&quot; figure based on the answers you provided and
-            reported settlement data. It is not legal advice, and is not a guarantee, promise, or prediction of any
-            specific result, settlement, or payment. No outcome is guaranteed and actual case values vary widely.
-            You&apos;ll be connected with an independent attorney for a free, no-obligation consultation.
-          </p>
         </div>
       )}
     </main>
+    {revealed && rich && (
+      <p className="reveal-disclaimer">
+        This estimate is illustrative only — an &quot;up to&quot; figure based on the answers you provided and
+        reported settlement data. It is not legal advice, and is not a guarantee, promise, or prediction of any
+        specific result, settlement, or payment. No outcome is guaranteed and actual case values vary widely.
+        You&apos;ll be connected with an independent attorney for a free, no-obligation consultation.
+      </p>
+    )}
     <SiteFooter />
     </>
   );

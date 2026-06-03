@@ -3,14 +3,21 @@
 
 import { useEffect } from "react";
 
-// Loads all third-party tags (GA4, GTM → FB/TikTok/AppLovin/Hyros, Clarity,
-// TrustedForm) right after hydration — for EVERY visitor, the way Meta/Hyros
-// expect. PageView/attribution fire on load (NOT gated on interaction) so the
-// ad algorithm + retargeting + Clarity bounce replays are never missed.
+// Third-party tags (GA4, GTM → FB/TikTok/AppLovin/Hyros, Clarity, TrustedForm).
+//
+// PERF: these are ~430KB+ of JS. Injecting them the instant React hydrated meant
+// they parsed/executed during first paint — the cause of the first-load jank,
+// worst on low-end Android. We now inject on the FIRST idle slot OR the first user
+// interaction (whichever comes first), so the critical first paint is clean.
+//
+// Nothing is lost: every visitor is still tagged (the idle fallback fires within
+// ~3s even with zero interaction), and any funnel events fired earlier queue in the
+// inline-seeded gtag/dataLayer stub (see layout.tsx) and replay when the scripts
+// load — so PageView and the Lead conversion (which fires at submit, long after the
+// tags are up) are never missed.
 export default function DeferredTags({ ga4, gtm, clarity }: { ga4?: string; gtm?: string; clarity?: string }) {
   useEffect(() => {
     const w = window as any;
-    let loaded = false;
 
     function inject(src: string) {
       const s = document.createElement("script");
@@ -18,9 +25,8 @@ export default function DeferredTags({ ga4, gtm, clarity }: { ga4?: string; gtm?
       document.head.appendChild(s);
     }
     function load() {
-      if (loaded || w.__cmaTags) return;
-      loaded = true;
-      w.__cmaTags = true; // guard against React double-mount re-injecting tags
+      if (w.__cmaTags) return;
+      w.__cmaTags = true; // guard against double-injection
 
       if (ga4) {
         w.dataLayer = w.dataLayer || [];
@@ -29,7 +35,7 @@ export default function DeferredTags({ ga4, gtm, clarity }: { ga4?: string; gtm?
         w.gtag("js", new Date());
         w.gtag("config", ga4, { experiment_variant: w.cmaVariant });
       }
-      // TrustedForm (compliance cert).
+      // TrustedForm (compliance cert) — only needed by submit, much later.
       inject("https://api.trustedform.com/trustedform.js?field=xxTrustedFormCertUrl&ping_field=xxTrustedFormPingUrl&l=" + new Date().getTime() + Math.random());
 
       if (gtm) {
@@ -44,7 +50,25 @@ export default function DeferredTags({ ga4, gtm, clarity }: { ga4?: string; gtm?
       }
     }
 
-    load();
+    // Fire on the first idle slot OR first user interaction, whichever comes first.
+    const EVENTS = ["pointerdown", "touchstart", "keydown", "scroll", "mousemove"];
+    let idleId: number | undefined;
+    let toId: number | undefined;
+    const fire = () => {
+      EVENTS.forEach((e) => window.removeEventListener(e, fire));
+      if (idleId !== undefined && w.cancelIdleCallback) w.cancelIdleCallback(idleId);
+      if (toId !== undefined) window.clearTimeout(toId);
+      load();
+    };
+    EVENTS.forEach((e) => window.addEventListener(e, fire, { passive: true }));
+    if (w.requestIdleCallback) idleId = w.requestIdleCallback(fire, { timeout: 3000 });
+    else toId = window.setTimeout(fire, 2200); // iOS Safari (no requestIdleCallback)
+
+    return () => {
+      EVENTS.forEach((e) => window.removeEventListener(e, fire));
+      if (idleId !== undefined && w.cancelIdleCallback) w.cancelIdleCallback(idleId);
+      if (toId !== undefined) window.clearTimeout(toId);
+    };
   }, [ga4, gtm, clarity]);
 
   return null;

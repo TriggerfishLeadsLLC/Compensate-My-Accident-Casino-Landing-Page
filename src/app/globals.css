@@ -200,9 +200,9 @@ h1,h2,h3{font-family:var(--font-sans);letter-spacing:-.02em;margin:0}
 .ns-body{display:flex;flex-direction:column;gap:3px;padding-top:3px}
 .ns-body b{font-size:16.5px;font-weight:800;color:#fff;line-height:1.2}
 .ns-body span{font-size:14.5px;color:#bccabf;line-height:1.45}
-.callout{display:flex;align-items:center;gap:13px;padding:15px 17px;border-radius:15px;border:1px solid rgba(31,209,127,.3);background:rgba(31,209,127,.07);font-size:14.5px;line-height:1.5;color:#dbe7df}
+.callout{display:flex;align-items:center;gap:15px;padding:18px 20px;border-radius:16px;border:1px solid rgba(31,209,127,.42);background:rgba(31,209,127,.1);font-size:16px;line-height:1.5;color:#e7f1ea}
 .callout b{color:#fff;font-weight:800}
-.callout-ico{flex-shrink:0;width:42px;height:42px;border-radius:12px;background:rgba(31,209,127,.14);display:flex;align-items:center;justify-content:center;font-size:20px}
+.callout-ico{flex-shrink:0;width:48px;height:48px;border-radius:13px;background:rgba(31,209,127,.18);color:var(--emer);display:flex;align-items:center;justify-content:center}
 .benefits ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
 .benefits li{position:relative;padding-left:30px;font-size:15.5px;line-height:1.45;color:#dbe7df}
 .benefits li::before{content:"✓";position:absolute;left:0;top:0;color:var(--emer);font-weight:900;font-size:17px}
@@ -212,7 +212,7 @@ h1,h2,h3{font-family:var(--font-sans);letter-spacing:-.02em;margin:0}
 .reveal-describe textarea{width:100%;background:#0e1712;border:1.5px solid rgba(31,209,127,.22);border-radius:13px;color:#fff;font-size:15px;padding:12px;outline:none;font-family:inherit}
 .reveal-describe textarea:focus{border-color:var(--emer)}
 .reveal-saved{color:var(--emer);font-size:13.5px;font-weight:700;margin-top:8px}
-.reveal-disclaimer{font-size:11px;color:#5d7367;margin:32px auto 0;max-width:30rem;line-height:1.5;padding-top:20px;border-top:1px solid var(--hair)}
+.reveal-disclaimer{font-size:11px;color:#5d7367;margin:0 auto;padding:0 22px 4px;max-width:28rem;line-height:1.55;text-align:center}
 /* Thank-you "pending / almost there" framing — light-touch urgency */
 .reveal-pending{display:inline-flex;align-items:center;gap:11px}
 .reveal-livedot{width:11px;height:11px;border-radius:50%;background:var(--emer);box-shadow:0 0 11px var(--emer);flex-shrink:0;animation:pulse 1.4s ease-in-out infinite}
@@ -221,7 +221,7 @@ h1,h2,h3{font-family:var(--font-sans);letter-spacing:-.02em;margin:0}
 .typrog-top b{font-weight:800}
 .typrog-top span{color:var(--emer);font-weight:900}
 .typrog-bar{height:12px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
-.typrog-bar span{display:block;height:100%;width:80%;border-radius:99px;box-shadow:0 0 12px rgba(31,209,127,.45);
+.typrog-bar span{display:block;height:100%;border-radius:99px;box-shadow:0 0 12px rgba(31,209,127,.45);transition:width 1s linear;
   background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.22) 0,rgba(255,255,255,.22) 10px,transparent 10px,transparent 20px),linear-gradient(90deg,var(--emer-2),var(--emer) 70%,var(--emer-bright));
   background-size:28px 100%,100% 100%;animation:barber .7s linear infinite}
 @keyframes barber{to{background-position:28px 0,0 0}}

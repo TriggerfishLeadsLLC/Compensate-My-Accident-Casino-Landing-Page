@@ -55,15 +55,27 @@ function buildSprites() {
   });
 }
 
+let ready = false;
+
 export function registerCanvas(c: HTMLCanvasElement) {
-  canvas = c; ctx = c.getContext("2d");
+  // PERF: store the ref only. Defer the heavy getContext + sprite build + full-viewport
+  // backing-store allocation to the first burst (ensureReady). On the LIGHT/compliant
+  // model the canvas is never used → never allocates; on HIGH it's off the load path
+  // (the intro burst is itself deferred to idle), so first paint stays smooth.
+  canvas = c;
+}
+
+function ensureReady() {
+  if (ready || !canvas) return;
+  ctx = canvas.getContext("2d");
   detectLowEnd();
   buildSprites();
+  ready = true;
   resize();
 }
 
 export function resize() {
-  if (!canvas || typeof window === "undefined") return;
+  if (!ready || !canvas || typeof window === "undefined") return;
   dpr = Math.min(window.devicePixelRatio || 1, lowEnd ? 1 : 1.5);
   W = window.innerWidth; H = window.innerHeight;
   canvas.width = Math.floor(W * dpr); canvas.height = Math.floor(H * dpr);
@@ -118,6 +130,7 @@ export interface BurstOpts {
 }
 
 export function coinBurst(o: BurstOpts) {
+  ensureReady();
   const want = o.count ?? 14;
   if (!ctx || reduce()) { if (o.onLand) for (let i = 0; i < want; i++) o.onLand(); return; }
   const n = Math.max(6, Math.round(want * (lowEnd ? 0.55 : 1)));
@@ -140,6 +153,7 @@ export function coinBurst(o: BurstOpts) {
 }
 
 export function shower(intense = false) {
+  ensureReady();
   if (!ctx || reduce()) return;
   const n = lowEnd ? (intense ? 36 : 22) : (intense ? 80 : 48);
   for (let i = 0; i < n; i++) {
