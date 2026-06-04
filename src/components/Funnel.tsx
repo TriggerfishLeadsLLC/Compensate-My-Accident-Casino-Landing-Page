@@ -103,15 +103,27 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   const progress = v2 ? Math.min(100, Math.round(18 + ((i + 1) / steps.length) * 82)) : Math.round(((i + 1) / steps.length) * 100);
   const range = useMemo(() => (ans.serviceType ? estimateRange(ans) : null), [ans]);
 
-  // Silent background ZIP from IP (best-effort).
+  // Silent background ZIP + state from IP (best-effort). State is normally
+  // supplied by Vercel edge headers (x-vercel-ip-country-region → initialState
+  // prop) but those don't exist in local dev and can be intermittently absent
+  // through some proxies. ipapi.co's region field (full state name like
+  // "Texas") gives us a reliable second source — mirrors v1.html's behavior.
+  // Both fields use ` || ` so user input and existing initialState always win.
   useEffect(() => {
     let done = false;
     (async () => {
       try {
         const r = await fetch("https://ipapi.co/json/");
         if (!r.ok || done) return;
-        const d = (await r.json()) as { postal?: string };
-        if (d.postal) setAns((a) => ({ ...a, zipcode: a.zipcode || String(d.postal) }));
+        const d = (await r.json()) as { postal?: string; region?: string; country_code?: string };
+        setAns((a) => {
+          const next = { ...a };
+          if (d.postal && !a.zipcode) next.zipcode = String(d.postal);
+          if (d.region && !a.stateText && (d.country_code ?? "US").toUpperCase() === "US") {
+            next.stateText = String(d.region);
+          }
+          return next;
+        });
       } catch {}
     })();
     return () => { done = true; };
