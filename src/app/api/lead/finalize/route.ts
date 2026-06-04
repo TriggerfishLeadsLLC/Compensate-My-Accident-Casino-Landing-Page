@@ -24,7 +24,9 @@ interface Body {
   attribution?: Attribution;
 }
 
-const PLUGIN_BASE = (process.env.CAH_PLUGIN_BASE_URL ?? "https://caraccidenthelp.net/wp-json/cah-split/v1").replace(/\/+$/, "");
+const PLUGIN_BASE_RAW = (process.env.CAH_PLUGIN_BASE_URL ?? "https://caraccidenthelp.net/wp-json/cah-split/v1").trim();
+const PLUGIN_BASE = PLUGIN_BASE_RAW.replace(/\/+$/, "");
+const LOG_ONLY_MODE = PLUGIN_BASE === "";
 
 // Empty describe falls back to a non-empty placeholder so the Make.com webhook
 // row always has a value in the describe field. Matches v1.html's
@@ -75,6 +77,11 @@ export async function POST(req: Request) {
     make_payload: payload,
     reason: "cma_describe_finalize",
   };
+
+  if (LOG_ONLY_MODE) {
+    console.log("[lead/finalize] LOG_ONLY_MODE — plugin POST skipped. Payload would be:\n" + JSON.stringify(pluginBody, null, 2));
+    return NextResponse.json({ ok: true, logOnly: true });
+  }
 
   try {
     const r = await fetch(`${PLUGIN_BASE}/lead/finalize`, {

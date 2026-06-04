@@ -22,7 +22,14 @@ interface Body {
 // Make.com forwarding (with its retry / idempotency / deferred-finalize
 // machinery), so all three split-test variants converge on one persistence
 // path. Override via env var if testing against a staging WordPress install.
-const PLUGIN_BASE = (process.env.CAH_PLUGIN_BASE_URL ?? "https://caraccidenthelp.net/wp-json/cah-split/v1").replace(/\/+$/, "");
+//
+// Empty string is a sentinel for "local dev / log-only mode" — the route
+// console.logs the full plugin payload and returns success without making a
+// network call. Set CAH_PLUGIN_BASE_URL=" " (any whitespace) in .env.local
+// to opt into this safely without touching prod.
+const PLUGIN_BASE_RAW = (process.env.CAH_PLUGIN_BASE_URL ?? "https://caraccidenthelp.net/wp-json/cah-split/v1").trim();
+const PLUGIN_BASE = PLUGIN_BASE_RAW.replace(/\/+$/, "");
+const LOG_ONLY_MODE = PLUGIN_BASE === "";
 
 // Source slug whitelisted in plugin RestApi::ALLOWED_SOURCES — see
 // includes/RestApi.php in the cah-split-tester plugin. Match exactly.
@@ -74,28 +81,39 @@ export async function POST(req: Request) {
   let delivered = false;
   let leadId: number | null = null;
 
-  try {
-    const r = await fetch(`${PLUGIN_BASE}/lead`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(pluginBody),
-    });
-    if (r.ok) {
-      delivered = true;
-      try {
-        const j = (await r.json()) as { lead_id?: number };
-        if (typeof j.lead_id === "number") leadId = j.lead_id;
-      } catch {
-        // body parse failure is non-fatal — lead was persisted, we just don't
-        // have an id to thread into finalize. Plugin's 6-min cron fallback
-        // will catch the deferred row and dispatch to Make even without a
-        // /api/lead/finalize follow-up.
+  if (LOG_ONLY_MODE) {
+    // Local dev / staging fallback — print the full plugin payload so we can
+    // verify shape without making a network call. Synthetic leadId lets the
+    // client's finalize() proceed end-to-end (the follow-up POST will also
+    // log-only). Set CAH_PLUGIN_BASE_URL to a real URL in .env to flip back
+    // to the live forward path.
+    console.log("[lead] LOG_ONLY_MODE — plugin POST skipped. Payload would be:\n" + JSON.stringify(pluginBody, null, 2));
+    delivered = true;
+    leadId = Math.floor(Math.random() * 1_000_000) + 1_000_000; // 7-digit synthetic id
+  } else {
+    try {
+      const r = await fetch(`${PLUGIN_BASE}/lead`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pluginBody),
+      });
+      if (r.ok) {
+        delivered = true;
+        try {
+          const j = (await r.json()) as { lead_id?: number };
+          if (typeof j.lead_id === "number") leadId = j.lead_id;
+        } catch {
+          // body parse failure is non-fatal — lead was persisted, we just don't
+          // have an id to thread into finalize. Plugin's 6-min cron fallback
+          // will catch the deferred row and dispatch to Make even without a
+          // /api/lead/finalize follow-up.
+        }
+      } else {
+        console.error(`[lead] plugin returned ${r.status}`);
       }
-    } else {
-      console.error(`[lead] plugin returned ${r.status}`);
+    } catch (e) {
+      console.error("[lead] plugin POST failed:", e);
     }
-  } catch (e) {
-    console.error("[lead] plugin POST failed:", e);
   }
 
   return NextResponse.json({
