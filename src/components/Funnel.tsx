@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STEPS, US_STATES, type Answers } from "@/lib/funnel";
 import { estimateRange, teaserValue, fmtUSD, valueModel } from "@/lib/estimate";
 import { track, trackLead, clarityTag } from "@/lib/analytics";
+import { readCahAttribution, type CahAttribution } from "@/lib/cahAttribution";
 import { coinBurst, shower, warmUp } from "@/lib/fx";
 import AccidentIcon from "@/components/AccidentIcon";
 import ValueHUD from "@/components/ValueHUD";
@@ -53,6 +54,14 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   const describeRef = useRef("");
   const finalizedRef = useRef(false);
   const inactivityRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Cached at /api/lead time, replayed verbatim in /api/lead/finalize so the
+  // plugin can rebuild a complete make_payload with the user's final describe
+  // text. attributionRef is also kept around so the finalize POST goes to the
+  // same plugin test/variant/visitor row as the original lead.
+  const attributionRef = useRef<CahAttribution | null>(null);
+  const leadIdRef = useRef<number | null>(null);
+  const utmsRef = useRef<Record<string, string>>({});
+  const trustedFormCertRef = useRef("");
 
   // Count the displayed value up to `to`, in place. This is the CORE reward and
   // runs in BOTH motion modes (a counter changing in place is informative, not
@@ -119,6 +128,20 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
     w.dataLayer.push({ experiment_variant: variant, reduced_motion: rm, value_model: valueModel() });
     try { clarityTag("variant", variant); clarityTag("reduced_motion", rm ? "on" : "off"); clarityTag("value_model", valueModel()); } catch {}
   }, [variant]);
+
+  // Capture caraccidenthelp.net split-test attribution from URL params (?cah_test_id
+  // / cah_variant_id / cah_visitor_id) on first paint and persist to sessionStorage.
+  // The plugin's Router::appendAttributionParams stamps these on every 302 to this
+  // page so we know which test bucket the visitor is in. Storing in a ref keeps
+  // the value cheap to read at submit time; doing it once on mount makes sure we
+  // capture the URL params even if a later client nav clears them.
+  useEffect(() => {
+    const attr = readCahAttribution();
+    if (attr) {
+      attributionRef.current = attr;
+      try { clarityTag("cah_test_id", String(attr.testId)); clarityTag("cah_variant_id", String(attr.variantId)); } catch {}
+    }
+  }, []);
 
   useEffect(() => {
     track("funnel_step_view", { step_number: i + 1, step_key: step?.key, step_total: steps.length });
@@ -207,13 +230,33 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       if (tf?.value) trustedFormCert = tf.value;
       sessionStorage.setItem("cma_estimate", JSON.stringify(estimateRange(ans)));
     } catch {}
+    // Cache utms + trustedFormCert + attribution so finalize() can rebuild the
+    // same make_payload + send to the same plugin row. attributionRef is read
+    // from URL params on first paint and persisted in sessionStorage, so it
+    // survives a mid-funnel page navigation.
+    utmsRef.current = utms;
+    trustedFormCertRef.current = trustedFormCert;
+    const attribution = readCahAttribution();
+    attributionRef.current = attribution;
     try {
       const res = await fetch("/api/lead", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: ans, utms, trustedFormCert }), keepalive: true,
+        body: JSON.stringify({
+          answers: ans,
+          utms,
+          trustedFormCert,
+          attribution: attribution ? {
+            testId: attribution.testId,
+            variantId: attribution.variantId,
+            visitorId: attribution.visitorId,
+          } : null,
+          landingUrl: window.location.href,
+        }),
+        keepalive: true,
       });
       const data = await res.json();
       eventIdRef.current = data.eventId ?? "";
+      leadIdRef.current = typeof data.leadId === "number" ? data.leadId : null;
       try { sessionStorage.setItem("cma_eventId", eventIdRef.current); } catch {}
       destRef.current = `${data.redirect}?lead_stage=${data.stage}`;
       setSubmitted(true);
@@ -228,11 +271,31 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
 
   // Append the (optional) describe details. Idempotent. Fires on stop-typing, a
   // 5-min cap, page-leave/abandon, or the See-Results button. Lead is already sent.
+  //
+  // Threads the full submit context (answers, utms, trustedFormCert, attribution,
+  // leadId) so the API route can rebuild the make_payload server-side and POST
+  // it to the plugin's /lead/finalize endpoint. The plugin then flips the
+  // deferred row to pending and dispatches to Make.com with the user's typed
+  // describe text. If leadId is missing (slow /api/lead response), the plugin's
+  // 6-minute cron sweep finalizes the deferred row anyway.
   function finalize(useBeacon = false) {
     if (finalizedRef.current) return;
     finalizedRef.current = true;
     if (inactivityRef.current) clearTimeout(inactivityRef.current);
-    const body = JSON.stringify({ eventId: eventIdRef.current, describe: describeRef.current });
+    const attr = attributionRef.current;
+    const body = JSON.stringify({
+      eventId: eventIdRef.current,
+      leadId: leadIdRef.current,
+      describe: describeRef.current,
+      answers: { ...ans, describe: describeRef.current },
+      utms: utmsRef.current,
+      trustedFormCert: trustedFormCertRef.current,
+      attribution: attr ? {
+        testId: attr.testId,
+        variantId: attr.variantId,
+        visitorId: attr.visitorId,
+      } : null,
+    });
     try {
       if (useBeacon && navigator.sendBeacon) {
         navigator.sendBeacon("/api/lead/finalize", new Blob([body], { type: "application/json" }));
