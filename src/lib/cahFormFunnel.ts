@@ -120,3 +120,42 @@ export function trackFormAbandon(currentCmaStepKey: string): void {
     true,
   );
 }
+
+// Public: fire a landing-pageview ping to the plugin's /pageview endpoint
+// via our /api/pageview proxy. Mirrors what v1.html's tracking.js fires on
+// caraccidenthelp.net so the plugin's cah_pageviews table sees a landing
+// row for variant 3 — without this, the per-variant "Landing pageviews"
+// column stays at 0 and the "Lost in transit" math (trigger_sent minus
+// landing_pageviews) reports 100% loss for CMA traffic. Fire-and-forget,
+// no-op when attribution is missing.
+export function trackPageview(): void {
+  if (typeof window === "undefined") return;
+  const attribution = readCahAttribution();
+  if (!attribution) return;
+
+  const url = new URL(window.location.href);
+  const q = url.searchParams;
+  const body = JSON.stringify({
+    test_id: attribution.testId,
+    variant_id: attribution.variantId,
+    visitor_id: attribution.visitorId,
+    path: url.pathname,
+    landing_url: window.location.href,
+    referrer: document.referrer || "",
+    utm_source: q.get("utm_source") ?? "",
+    utm_medium: q.get("utm_medium") ?? "",
+    utm_campaign: q.get("utm_campaign") ?? "",
+    utm_term: q.get("utm_term") ?? "",
+    utm_content: q.get("utm_content") ?? "",
+    clickid: q.get("clickid") ?? "",
+  });
+
+  try {
+    fetch("/api/pageview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true,
+    }).catch(() => {});
+  } catch {}
+}

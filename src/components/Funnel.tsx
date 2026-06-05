@@ -5,7 +5,7 @@ import { STEPS, US_STATES, type Answers } from "@/lib/funnel";
 import { estimateRange, teaserValue, fmtUSD, valueModel } from "@/lib/estimate";
 import { track, trackLead, clarityTag } from "@/lib/analytics";
 import { readCahAttribution, type CahAttribution } from "@/lib/cahAttribution";
-import { trackFormView, trackStepCompleted, trackFormAbandon, catalogSlotForStepKey, CMA_STEP_TO_CATALOG } from "@/lib/cahFormFunnel";
+import { trackFormView, trackStepCompleted, trackFormAbandon, trackPageview, catalogSlotForStepKey, CMA_STEP_TO_CATALOG } from "@/lib/cahFormFunnel";
 import { pushFormBoot, pushStepCompleted, pushFormSubmit, pushLeadStage, pushFormAbandonment } from "@/lib/cahV1DataLayer";
 import { coinBurst, shower, warmUp } from "@/lib/fx";
 import AccidentIcon from "@/components/AccidentIcon";
@@ -236,6 +236,10 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       // cah_form_funnel_events table sees a denominator for variant 3's
       // step-completion percentages. Only fires once per page load.
       trackFormView();
+      // Mirror v1.html's tracking.js POST /pageview so the plugin's
+      // cah_pageviews table sees a landing-pageview row for variant 3.
+      // Without this the test detail's "Lost in transit" reports 100%.
+      trackPageview();
       // v1.html parity: push cah_form_boot to dataLayer so the shared GTM
       // container (GTM-W9T5LS86) sees the same session-start signal it sees
       // on v1 visitors. GTM Initialization-Trigger tags fire on this event.
