@@ -5,6 +5,7 @@ import { STEPS, US_STATES, type Answers } from "@/lib/funnel";
 import { estimateRange, teaserValue, fmtUSD, valueModel } from "@/lib/estimate";
 import { track, trackLead, clarityTag } from "@/lib/analytics";
 import { readCahAttribution, type CahAttribution } from "@/lib/cahAttribution";
+import { trackFormView, trackStepCompleted, trackFormAbandon } from "@/lib/cahFormFunnel";
 import { coinBurst, shower, warmUp } from "@/lib/fx";
 import AccidentIcon from "@/components/AccidentIcon";
 import ValueHUD from "@/components/ValueHUD";
@@ -109,6 +110,12 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   // through some proxies. ipapi.co's region field (full state name like
   // "Texas") gives us a reliable second source — mirrors v1.html's behavior.
   // Both fields use ` || ` so user input and existing initialState always win.
+  //
+  // CMA has NO visible zipcode step (zip is silently auto-filled, then sent
+  // with the lead). For the plugin's form funnel we still want a step 7
+  // (zipcode) completion event so the catalog's per-step counts make sense
+  // — fire trackStepCompleted("zipcode") here when ipapi populates the zip.
+  // Mirrors v1.html's gfTrackAutoCompletedStep(7) for the same scenario.
   useEffect(() => {
     let done = false;
     (async () => {
@@ -116,18 +123,48 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
         const r = await fetch("https://ipapi.co/json/");
         if (!r.ok || done) return;
         const d = (await r.json()) as { postal?: string; region?: string; country_code?: string };
+        let zipApplied = false;
         setAns((a) => {
           const next = { ...a };
-          if (d.postal && !a.zipcode) next.zipcode = String(d.postal);
+          if (d.postal && !a.zipcode) {
+            next.zipcode = String(d.postal);
+            zipApplied = true;
+          }
           if (d.region && !a.stateText && (d.country_code ?? "US").toUpperCase() === "US") {
             next.stateText = String(d.region);
           }
           return next;
         });
+        if (zipApplied) trackStepCompleted("zipcode");
       } catch {}
     })();
     return () => { done = true; };
   }, []);
+
+  // Plugin form-funnel form_abandon. Fires on page unload (pagehide) OR
+  // visibilitychange:hidden, but ONLY before the lead has been submitted
+  // (i.e., we're still in the question steps, not the describe phase).
+  // After submit, the existing describe useEffect below owns the unload
+  // listeners and handles describe finalize via /api/lead/finalize.
+  //
+  // Reports the visitor's CURRENT step.key as the abandon point. Skips if
+  // they never reached step 1 (no startedRef yet), since dispatching an
+  // abandon for a never-started form is meaningless.
+  useEffect(() => {
+    if (submitted) return; // post-submit: describe useEffect owns the listeners
+    const onAbandon = () => {
+      if (!startedRef.current || submitted) return;
+      const key = step?.key ?? "serviceType";
+      trackFormAbandon(key);
+    };
+    const onVisHide = () => { if (document.visibilityState === "hidden") onAbandon(); };
+    window.addEventListener("pagehide", onAbandon);
+    document.addEventListener("visibilitychange", onVisHide);
+    return () => {
+      window.removeEventListener("pagehide", onAbandon);
+      document.removeEventListener("visibilitychange", onVisHide);
+    };
+  }, [submitted, step?.key]);
 
   // Report THIS page's variant (route-driven: / = control, /v2 = optimized) plus
   // the user's reduce-motion preference to analytics, so we can measure its real
@@ -158,7 +195,14 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   useEffect(() => {
     track("funnel_step_view", { step_number: i + 1, step_key: step?.key, step_total: steps.length });
     clarityTag("funnel_step", String(i + 1));
-    if (!startedRef.current) { startedRef.current = true; track("funnel_start"); }
+    if (!startedRef.current) {
+      startedRef.current = true;
+      track("funnel_start");
+      // Mirror v1.html's `gfTrackWpFunnel('form_view', 1)` so the plugin's
+      // cah_form_funnel_events table sees a denominator for variant 3's
+      // step-completion percentages. Only fires once per page load.
+      trackFormView();
+    }
   }, [i, step?.key, steps.length]);
 
   // V2 only: auto-play the value teaser on load (curiosity hook before any tap).
@@ -316,6 +360,11 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       }
     } catch {}
     track("describe_finalized", { hasText: describeRef.current.trim().length > 0 });
+    // Plugin form-funnel: report describe (catalog step 12) as completed so
+    // Looker's cumulative funnel sees a step_completed_12 row for variant 3.
+    // Matches v1.html's gfFireSubmitTracking() flow where step 12 is the
+    // describe completion marker.
+    trackStepCompleted("describe");
   }
 
   function onDescribe(v: string) {
@@ -352,6 +401,10 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
     const nextAns = { ...ans, [step.key]: value };
     setAns(nextAns); setErr(""); haptic([6, 16, 8]);
     track("funnel_step_complete", { step_number: i + 1, step_key: step.key, value });
+    // Plugin form-funnel mirror — maps CMA's step.key to the v1.html
+    // FormFunnelStepCatalog slot so the WP cah_form_funnel_events table sees
+    // a step_completed row keyed by canonical slug + step_number.
+    trackStepCompleted(step.key);
     fireReward(ox, oy, nextAns, i + 1, step.key === "serviceType" || step.key === "injury");
     window.setTimeout(() => goTo(i + 1), 300);
   }
@@ -374,6 +427,15 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       return;
     }
     track("funnel_step_complete", { step_number: i + 1, step_key: step.key, phase: contactPhase });
+    // Plugin form-funnel mirror. For the dual-phase phone/email step, we map
+    // the phone subphase to catalog step 10 (phone) and the email subphase
+    // to step 11 (email) — matches v1.html's two-step PII collection so
+    // Looker sees a comparable funnel shape across all three variants.
+    if (step.kind === "phone") {
+      trackStepCompleted(contactPhase === "email" ? "email" : "phone");
+    } else {
+      trackStepCompleted(step.key);
+    }
     haptic(10);
     const ox = e?.clientX ?? window.innerWidth / 2;
     const oy = e?.clientY ?? window.innerHeight * 0.7;
@@ -384,7 +446,15 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
         const r = await fetch("/api/enrich", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: localPhone(ans.phone ?? "") }) });
         const d = await r.json();
         setBusy(false);
-        if (d?.email) { setAns((a) => ({ ...a, email: d.email })); await doSubmit(); return; }
+        if (d?.email) {
+          // Trestle returned an email — we skip the email subphase entirely.
+          // Mirror v1.html's gfTrackAutoCompletedStep(11) so catalog step 11
+          // (email) still shows as completed in Looker for variant 3.
+          setAns((a) => ({ ...a, email: d.email }));
+          trackStepCompleted("email");
+          await doSubmit();
+          return;
+        }
       } catch { setBusy(false); }
       setContactPhase("email");
       return;
