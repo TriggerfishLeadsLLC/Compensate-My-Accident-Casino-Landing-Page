@@ -390,6 +390,7 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   // 6-minute cron sweep finalizes the deferred row anyway.
   function finalize(useBeacon = false) {
     if (finalizedRef.current) return;
+    console.log(`[finalize] called: useBeacon=${useBeacon}, describeRef.current=${JSON.stringify(describeRef.current)}, stack=${new Error().stack?.split("\n").slice(1, 4).join(" <- ")}`);
     finalizedRef.current = true;
     if (inactivityRef.current) clearTimeout(inactivityRef.current);
     const attr = attributionRef.current;
@@ -431,6 +432,7 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   // weird divergence vs v1.html / v2.html in Looker comparisons.
   const describeFirstKeystrokeRef = useRef(false);
   function onDescribe(v: string) {
+    console.log(`[describe-typing] len=${v.length}, value=${JSON.stringify(v)}`);
     setDescribe(v);
     describeRef.current = v;
     if (describeFirstKeystrokeRef.current) return;
@@ -446,24 +448,32 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   }
 
   // Describe phase: 5-min finalize timer (matches v1.html's GF_FINAL_SUBMIT_MAX_MS).
-  // Armed on entry, reset ONCE on first keystroke (see onDescribe). pagehide /
-  // visibilitychange:hidden fire finalize immediately regardless — we always
-  // want the typed describe to land if the page is unloading.
+  // Armed on entry, reset ONCE on first keystroke (see onDescribe). pagehide
+  // and beforeunload fire finalize immediately because the page is actually
+  // unloading — we always want the typed describe to land at that point.
+  //
+  // We DELIBERATELY do not listen on visibilitychange:hidden here, matching
+  // v1.html's gfMaybeBeaconFinalize binding (pagehide + beforeunload only).
+  // visibilitychange fires whenever the user briefly backgrounds the tab
+  // (alt-tab on desktop, app-switch on mobile to copy a phone number, even
+  // DevTools focus shifts on dev) — finalizing on every one of those is
+  // premature and was firing immediately with an empty describe in testing.
+  // Real exits hit pagehide; transient hides should let the 5-min cap or
+  // server-side cron fallback finish the job if the user truly walks away.
   //
   // Sharing the inactivityRef timer slot with onDescribe so first-keystroke
   // reset just resets the existing timer instead of racing two parallel ones.
   useEffect(() => {
     if (contactPhase !== "describe") return;
-    const onHide = () => { if (document.visibilityState === "hidden") finalize(true); };
     const onLeave = () => finalize(true);
     if (inactivityRef.current) clearTimeout(inactivityRef.current);
     inactivityRef.current = setTimeout(() => finalize(false), 5 * 60 * 1000);
     window.addEventListener("pagehide", onLeave);
-    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("beforeunload", onLeave);
     return () => {
       if (inactivityRef.current) clearTimeout(inactivityRef.current);
       window.removeEventListener("pagehide", onLeave);
-      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("beforeunload", onLeave);
     };
   }, [contactPhase]); // eslint-disable-line react-hooks/exhaustive-deps
 
