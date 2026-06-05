@@ -132,7 +132,10 @@ export function classify(a: Answers): { qualified: boolean; redirect: string; st
     a.attorney === "not_yet" &&
     Q2.includes(a.accidentHappen ?? "");
   if (isQ) return { qualified: true, redirect: "/thank-you", stage: "qualified-lead" };
-  if (a.injury === "no") return { qualified: false, redirect: "/diminished-value-claim", stage: "disqualified-lead" };
+  // Single DQ destination — the no-injury subset used to land on
+  // /diminished-value-claim, but for the cah-split-tester integration we
+  // consolidate all DQs onto /finished so there's one DQ thank-you page
+  // matching v1.html's /finished/ pattern.
   return { qualified: false, redirect: "/finished", stage: "disqualified-lead" };
 }
 
