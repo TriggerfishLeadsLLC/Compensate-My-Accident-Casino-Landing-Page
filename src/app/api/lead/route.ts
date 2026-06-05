@@ -21,15 +21,15 @@ interface Body {
 // Plugin REST base URL on caraccidenthelp.net. The plugin handles the actual
 // Make.com forwarding (with its retry / idempotency / deferred-finalize
 // machinery), so all three split-test variants converge on one persistence
-// path. Override via env var if testing against a staging WordPress install.
+// path. Override via env var only if testing against a staging WordPress install.
 //
-// Empty string is a sentinel for "local dev / log-only mode" — the route
-// console.logs the full plugin payload and returns success without making a
-// network call. Set CAH_PLUGIN_BASE_URL=" " (any whitespace) in .env.local
-// to opt into this safely without touching prod.
-const PLUGIN_BASE_RAW = (process.env.CAH_PLUGIN_BASE_URL ?? "https://caraccidenthelp.net/wp-json/cah-split/v1").trim();
+// `||` (not `??`) so an empty env var falls back to the default — Vercel
+// projects sometimes carry an empty CAH_PLUGIN_BASE_URL over from local
+// .env.local imports, which would otherwise silently force LOG_ONLY_MODE in
+// production. Log-only mode now requires an EXPLICIT CAH_LOG_ONLY=1 flag.
+const PLUGIN_BASE_RAW = (process.env.CAH_PLUGIN_BASE_URL || "https://caraccidenthelp.net/wp-json/cah-split/v1").trim();
 const PLUGIN_BASE = PLUGIN_BASE_RAW.replace(/\/+$/, "");
-const LOG_ONLY_MODE = PLUGIN_BASE === "";
+const LOG_ONLY_MODE = process.env.CAH_LOG_ONLY === "1";
 
 // Source slug whitelisted in plugin RestApi::ALLOWED_SOURCES — see
 // includes/RestApi.php in the cah-split-tester plugin. Match exactly.

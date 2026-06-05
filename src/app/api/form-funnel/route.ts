@@ -11,9 +11,9 @@ interface Body {
   visitor_id?: string | null;
 }
 
-const PLUGIN_BASE_RAW = (process.env.CAH_PLUGIN_BASE_URL ?? "https://caraccidenthelp.net/wp-json/cah-split/v1").trim();
+const PLUGIN_BASE_RAW = (process.env.CAH_PLUGIN_BASE_URL || "https://caraccidenthelp.net/wp-json/cah-split/v1").trim();
 const PLUGIN_BASE = PLUGIN_BASE_RAW.replace(/\/+$/, "");
-const LOG_ONLY_MODE = PLUGIN_BASE === "";
+const LOG_ONLY_MODE = process.env.CAH_LOG_ONLY === "1";
 
 const ALLOWED_EVENTS = new Set(["form_view", "step_completed", "form_abandon"]);
 

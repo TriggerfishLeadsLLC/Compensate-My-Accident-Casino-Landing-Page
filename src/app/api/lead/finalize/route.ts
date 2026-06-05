@@ -24,9 +24,9 @@ interface Body {
   attribution?: Attribution;
 }
 
-const PLUGIN_BASE_RAW = (process.env.CAH_PLUGIN_BASE_URL ?? "https://caraccidenthelp.net/wp-json/cah-split/v1").trim();
+const PLUGIN_BASE_RAW = (process.env.CAH_PLUGIN_BASE_URL || "https://caraccidenthelp.net/wp-json/cah-split/v1").trim();
 const PLUGIN_BASE = PLUGIN_BASE_RAW.replace(/\/+$/, "");
-const LOG_ONLY_MODE = PLUGIN_BASE === "";
+const LOG_ONLY_MODE = process.env.CAH_LOG_ONLY === "1";
 
 // Empty describe falls back to a non-empty placeholder so the Make.com webhook
 // row always has a value in the describe field. Matches v1.html's
