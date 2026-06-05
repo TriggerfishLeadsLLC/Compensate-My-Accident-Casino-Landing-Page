@@ -163,7 +163,6 @@ export function coinBurst(o: BurstOpts) {
   ensureRunning();
 }
 
-// Celebration rain: coins fall straight down across the full width (from the top).
 export function shower(intense = false) {
   ensureReady();
   if (!ctx || reduce()) return;
