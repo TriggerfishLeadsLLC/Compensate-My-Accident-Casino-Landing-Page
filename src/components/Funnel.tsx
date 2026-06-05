@@ -63,6 +63,13 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   const leadIdRef = useRef<number | null>(null);
   const utmsRef = useRef<Record<string, string>>({});
   const trustedFormCertRef = useRef("");
+  // Fire-once guard for form_abandon. pagehide AND visibilitychange:hidden
+  // both fire on a real tab close (browser behavior), so without this guard
+  // we'd POST two abandon events for one user. Once set, stays set for the
+  // session — if the user comes back, advances further, then abandons again,
+  // we don't double-count (first abandon already captured the fact they
+  // didn't complete; second one would just inflate the abandonment column).
+  const abandonedRef = useRef(false);
 
   // Count the displayed value up to `to`, in place. This is the CORE reward and
   // runs in BOTH motion modes (a counter changing in place is informative, not
@@ -142,27 +149,48 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   }, []);
 
   // Plugin form-funnel form_abandon. Fires on page unload (pagehide) OR
-  // visibilitychange:hidden, but ONLY before the lead has been submitted
-  // (i.e., we're still in the question steps, not the describe phase).
-  // After submit, the existing describe useEffect below owns the unload
-  // listeners and handles describe finalize via /api/lead/finalize.
+  // visibilitychange:hidden after a 30s delay, but ONLY before the lead has
+  // been submitted (i.e., we're still in the question steps, not the
+  // describe phase). After submit, the existing describe useEffect below
+  // owns the unload listeners and handles describe finalize via
+  // /api/lead/finalize.
   //
-  // Reports the visitor's CURRENT step.key as the abandon point. Skips if
-  // they never reached step 1 (no startedRef yet), since dispatching an
-  // abandon for a never-started form is meaningless.
+  // Two safeguards against false abandons (mirrors v1.html FIX #4):
+  //   1. visibilitychange:hidden waits 30s before firing — gives the user
+  //      time to alt-tab, open devtools, switch devices in emulation, etc.
+  //      Returning to visible cancels the pending abandon.
+  //   2. abandonedRef.current fire-once guard — pagehide AND visibilitychange
+  //      both fire on a real tab close; without this we'd double-count.
+  //
+  // pagehide fires immediately (no delay) because by the time it fires the
+  // page is already unloading — waiting 30s would mean the event never lands.
   useEffect(() => {
     if (submitted) return; // post-submit: describe useEffect owns the listeners
-    const onAbandon = () => {
-      if (!startedRef.current || submitted) return;
+    let visibilityTimer: ReturnType<typeof setTimeout> | null = null;
+    const fireAbandon = () => {
+      if (abandonedRef.current || !startedRef.current || submitted) return;
+      abandonedRef.current = true;
       const key = step?.key ?? "serviceType";
       trackFormAbandon(key);
     };
-    const onVisHide = () => { if (document.visibilityState === "hidden") onAbandon(); };
-    window.addEventListener("pagehide", onAbandon);
-    document.addEventListener("visibilitychange", onVisHide);
+    const onVisChange = () => {
+      if (document.visibilityState === "hidden") {
+        // Defer — alt-tab / devtools / brief focus loss shouldn't count.
+        if (visibilityTimer) clearTimeout(visibilityTimer);
+        visibilityTimer = setTimeout(fireAbandon, 30000);
+      } else if (visibilityTimer) {
+        // User returned within 30s — cancel the pending abandon.
+        clearTimeout(visibilityTimer);
+        visibilityTimer = null;
+      }
+    };
+    const onPagehide = () => fireAbandon();
+    window.addEventListener("pagehide", onPagehide);
+    document.addEventListener("visibilitychange", onVisChange);
     return () => {
-      window.removeEventListener("pagehide", onAbandon);
-      document.removeEventListener("visibilitychange", onVisHide);
+      if (visibilityTimer) clearTimeout(visibilityTimer);
+      window.removeEventListener("pagehide", onPagehide);
+      document.removeEventListener("visibilitychange", onVisChange);
     };
   }, [submitted, step?.key]);
 
