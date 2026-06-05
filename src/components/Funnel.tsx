@@ -314,7 +314,14 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   // Sends the lead + fires the qualified-lead conversion, THEN reveals the
   // (optional) describe step. The describe is appended later via finalize() — if
   // the user never fills it, the lead is already captured here in the background.
-  async function doSubmit() {
+  //
+  // answersOverride lets callers pass a freshly-computed Answers object instead
+  // of relying on `ans` state. Needed because setAns() is async — React state
+  // updates aren't visible until the next render, so a `setAns(); await doSubmit()`
+  // sequence reads stale data. The Trestle auto-skip path uses this to thread
+  // the just-returned email into the lead POST.
+  async function doSubmit(answersOverride?: Answers) {
+    const submitAnswers = answersOverride ?? ans;
     setBusy(true); setErr("");
     const utms: Record<string, string> = {};
     let trustedFormCert = "";
@@ -322,7 +329,7 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       new URLSearchParams(window.location.search).forEach((v, k) => (utms[k] = v));
       const tf = document.querySelector<HTMLInputElement>('[name="xxTrustedFormCertUrl"]');
       if (tf?.value) trustedFormCert = tf.value;
-      sessionStorage.setItem("cma_estimate", JSON.stringify(estimateRange(ans)));
+      sessionStorage.setItem("cma_estimate", JSON.stringify(estimateRange(submitAnswers)));
     } catch {}
     // Cache utms + trustedFormCert + attribution so finalize() can rebuild the
     // same make_payload + send to the same plugin row. attributionRef is read
@@ -336,7 +343,7 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       const res = await fetch("/api/lead", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          answers: ans,
+          answers: submitAnswers,
           utms,
           trustedFormCert,
           attribution: attribution ? {
@@ -362,8 +369,8 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       // tags (e.g. fire FB Lead only for qualified) target correctly. Stage
       // prefix is "cma" so variant 3 leads are distinguishable from v1/v2 in
       // the lead_stage field.
-      pushFormSubmit(ans, data.stage, "manual");
-      pushLeadStage(ans, data.stage, "cma");
+      pushFormSubmit(submitAnswers, data.stage, "manual");
+      pushLeadStage(submitAnswers, data.stage, "cma");
       setBusy(false);
       setContactPhase("describe"); // reveal the optional "strengthen your case" step
     } catch {
@@ -517,9 +524,15 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
           // Trestle returned an email — we skip the email subphase entirely.
           // Mirror v1.html's gfTrackAutoCompletedStep(11) so catalog step 11
           // (email) still shows as completed in Looker for variant 3.
-          setAns((a) => ({ ...a, email: d.email }));
+          //
+          // Pass the freshly-merged answers object directly to doSubmit() so
+          // it sees the Trestle email without waiting for the setAns React
+          // state update to land. React batches state updates between renders,
+          // so an await doSubmit() right after setAns reads stale `ans`.
+          const merged: Answers = { ...ans, email: d.email };
+          setAns(merged);
           trackStepCompleted("email");
-          await doSubmit();
+          await doSubmit(merged);
           return;
         }
       } catch { setBusy(false); }
