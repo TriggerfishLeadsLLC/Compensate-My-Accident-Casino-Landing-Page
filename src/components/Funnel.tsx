@@ -279,9 +279,9 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
     fireReward(ox, oy, nextAns, i + 1, step.key === "serviceType" || step.key === "injury");
     // Celebratory coin shower right after the lawyer question, on the transition to
     // "Where did the accident happen?" — fires every time, independent of any value
-    // milestone. Coins sweep in from the sides and fall. HIGH-model flair only;
-    // shower() itself respects reduced-motion.
-    if (step.key === "attorney" && valueModel() === "high") shower(true, "sides");
+    // milestone. Coins rain down from the top. HIGH-model flair only; shower()
+    // itself respects reduced-motion.
+    if (step.key === "attorney" && valueModel() === "high") shower(true);
     window.setTimeout(() => goTo(i + 1), 300);
   }
 

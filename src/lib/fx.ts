@@ -163,28 +163,16 @@ export function coinBurst(o: BurstOpts) {
   ensureRunning();
 }
 
-// Celebration rain. from="top": coins fall across the full width (used at the
-// reveal). from="sides": coins burst in from the left & right edges and arc down
-// (used at the lawyer-question transition) — "from the side" but still falling.
-export function shower(intense = false, from: "top" | "sides" = "top") {
+// Celebration rain: coins fall straight down across the full width (from the top).
+export function shower(intense = false) {
   ensureReady();
   if (!ctx || reduce()) return;
   const n = lowEnd ? (intense ? 36 : 22) : (intense ? 80 : 48);
   for (let i = 0; i < n; i++) {
     const isCoin = Math.random() < 0.5;
-    let x: number, y: number, vx: number, vy: number;
-    if (from === "sides") {
-      const left = i % 2 === 0;
-      x = left ? -30 - Math.random() * 30 : W + 30 + Math.random() * 30;
-      y = 20 + Math.random() * (H * 0.30);
-      vx = (left ? 1 : -1) * (8 + Math.random() * 8); // inward
-      vy = -1 + Math.random() * 3;                     // then gravity pulls it down
-    } else {
-      x = Math.random() * W; y = -20 - Math.random() * 80;
-      vx = (Math.random() - 0.5) * 3; vy = 2 + Math.random() * 4;
-    }
     particles.push({
-      x, y, vx, vy,
+      x: Math.random() * W, y: -20 - Math.random() * 80,
+      vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 4,
       tx: 0, ty: 0, kind: isCoin ? "coin" : "spark",
       r: isCoin ? 9 + Math.random() * 6 : 5 + Math.random() * 4,
       rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.6,
