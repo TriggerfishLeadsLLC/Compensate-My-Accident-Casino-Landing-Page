@@ -24,7 +24,7 @@ export default async function FunnelPage({ variant }: { variant: "control" | "op
           <div className="eyebrow">Free Compensation Calculator</div>
           <h1>
             {v2
-              ? <>See what your {where}accident is <em>really</em> worth</>
+              ? <>See what your {where}accident could <em>really</em> be worth</>
               : <>What&apos;s your {where}claim worth?</>}
           </h1>
           <p className="sub0">Answer a few quick questions and watch your estimate build in real time. Free, no obligation.</p>

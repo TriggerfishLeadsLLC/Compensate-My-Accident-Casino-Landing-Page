@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { valueModel } from "@/lib/estimate";
 
 // Live-FOMO ticker: "Someone in {place} just checked: $X".
-// LIGHT (compliant): grounded amounts, capped at $104,500, mostly $40–65k with a
-// few 80s/90s/100s. HIGH (aggressive): larger amounts to match the high model.
-const AMOUNTS_LIGHT = [48700, 56200, 41900, 63500, 52800, 89400, 47300, 61200, 97500, 44100, 58900, 104500, 66400, 83200, 51500, 72800, 93600];
-const AMOUNTS_HIGH = [96400, 127000, 84200, 152000, 73800, 118500, 210000, 98700, 142000, 64500, 176000];
+// Amounts mirror what the calculator actually outputs — rounded like the model
+// (LIGHT to $500, HIGH to $1,000) and kept inside each model's real min/max — so
+// a "checked" number always looks like an estimate a user could really get.
+// LIGHT (compliant): ~$48k–$122k. HIGH (aggressive): ~$67k–$295k.
+const AMOUNTS_LIGHT = [52500, 68000, 47500, 91500, 61000, 103000, 74500, 84000, 116000, 57500, 97500, 66500, 122000, 78000, 88500, 51000, 109500];
+const AMOUNTS_HIGH = [98000, 142000, 84000, 210000, 121000, 268000, 76000, 184000, 295000, 113000, 232000, 67000, 158000, 247000, 92000, 176000];
 const CITIES = ["Miami", "Dallas", "Phoenix", "Atlanta", "Chicago", "Newark", "Tampa", "Houston"];
 
 export default function Ticker({ stateName }: { stateName?: string }) {

@@ -11,22 +11,25 @@
 //   • Insurance Research Council — attorney-represented claims settle ~3.5× higher.
 //   • NHTSA 2023 — motorcyclists ~5× more likely injured/severe per mile; large
 //       trucks inflict far worse injuries on the other vehicle (per-type basis).
-// LIGHT is deliberately conservative (III average ~$24k sits INSIDE the car range;
-// no catastrophic outliers). Output is ILLUSTRATIVE, never a guarantee (UI disclaimer).
+// LIGHT was data-anchored then nudged ~20% (commercial direction); the III average
+// ~$24k still sits INSIDE the car range and there are no catastrophic outliers.
+// Output is ILLUSTRATIVE, never a guarantee (UI disclaimer).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Answers } from "./funnel";
 
-// Conservative, data-grounded ranges (injured, not-at-fault). DEFAULT.
+// Conservative, data-grounded ranges (injured, not-at-fault), nudged ~20% for the
+// compliant version per commercial direction — still inside published serious-injury
+// ranges (no catastrophic outliers). DEFAULT.
 const BASE_LIGHT: Record<string, { low: number; high: number }> = {
-  car_accident:        { low: 8000,  high: 85000 }, // low=minor; high=serious (not catastrophic). III avg $24,211 + BJS median $15k sit in-range
-  motorcycle_accident: { low: 11000, high: 92000 }, // NHTSA: ~5x more likely injured + more severe
-  trucking_accident:   { low: 13000, high: 98000 }, // severe injuries to passenger-vehicle occupants
-  pedestrian_accident: { low: 11000, high: 92000 },
-  bicycle_accident:    { low: 9000,  high: 80000 },
-  work_accident:       { low: 8000,  high: 72000 },
+  car_accident:        { low: 9500,  high: 102000 }, // low=minor; high=serious (not catastrophic). III avg $24,211 + BJS median $15k still sit in-range
+  motorcycle_accident: { low: 13000, high: 110000 }, // NHTSA: ~5x more likely injured + more severe
+  trucking_accident:   { low: 15500, high: 118000 }, // severe injuries to passenger-vehicle occupants
+  pedestrian_accident: { low: 13000, high: 110000 },
+  bicycle_accident:    { low: 11000, high: 96000 },
+  work_accident:       { low: 9500,  high: 86000 },
 };
-const DEFAULT_LIGHT = { low: 8000, high: 72000 };
+const DEFAULT_LIGHT = { low: 9500, high: 86000 };
 
 // Aggressive "upper-potential" model (pre-grounding). Reach it with ?model=high.
 const BASE_HIGH: Record<string, { low: number; high: number }> = {
@@ -54,7 +57,7 @@ export function estimateRange(a: Answers): { low: number; high: number } {
   const high = valueModel() === "high";
   const base = (high ? BASE_HIGH : BASE_LIGHT)[a.serviceType ?? ""] ?? (high ? DEFAULT_HIGH : DEFAULT_LIGHT);
   // No injury → property-damage / diminished-value territory (III PD $5,313).
-  if (a.injury === "no") return high ? { low: 1500, high: 8000 } : { low: 500, high: 5000 };
+  if (a.injury === "no") return high ? { low: 1500, high: 8000 } : { low: 600, high: 6000 };
 
   // Comparative negligence: recovery reduced by claimant's share of fault.
   const fault = a.fault === "no" ? 1 : a.fault === "not_sure" ? 0.7 : a.fault === "yes" ? 0.35 : 0.85;

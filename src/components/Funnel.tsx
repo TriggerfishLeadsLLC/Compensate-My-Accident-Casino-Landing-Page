@@ -272,27 +272,30 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   // On every answer the number always climbs (both models). Coins, shake, combat
   // overlay, and coin shower are HIGH-MODEL flair only — off on the light/compliance
   // model so it's clean and professional for approval.
-  function fireReward(ox: number, oy: number, nextAns: Answers, nextIndex: number, big = false) {
+  // `celebrate` = fire the big moment (shake + coin shower + intense burst). It used
+  // to be triggered by the value crossing the $100k milestone; it's now triggered by
+  // answering the lawyer question (see onCard). `big` keeps the lighter shake on the
+  // first couple of engaging steps (serviceType / injury).
+  function fireReward(ox: number, oy: number, nextAns: Answers, nextIndex: number, big = false, celebrate = false) {
     if (!nextAns.serviceType) return;
     const target = teaserValue(nextAns, nextIndex, STEPS.length);
     const start = shownRef.current;
     const delta = Math.max(0, target - start);
 
     if (valueModel() === "high" && !prefersReduced()) {
-      const crossed = (start < 100000 && target >= 100000) || (start < 500000 && target >= 500000);
       if (delta > 0) {
         const ckey = Date.now();
         setCombat({ text: `+${fmtUSD(delta)}`, key: ckey });
         window.setTimeout(() => setCombat((c) => (c && c.key === ckey ? null : c)), 1200);
       }
-      if (crossed || big) { setShaking(true); window.setTimeout(() => setShaking(false), 520); }
-      if (crossed) shower(true);
+      if (celebrate || big) { setShaking(true); window.setTimeout(() => setShaking(false), 520); }
+      if (celebrate) shower(true);
       const el = document.getElementById("cma-value");
       const r = el?.getBoundingClientRect();
       const tx = r ? r.left + r.width / 2 : window.innerWidth / 2;
       const ty = r ? r.top + r.height / 2 : 130;
       const count = Math.min(28, Math.max(12, Math.round(Math.max(delta, 14000) / 6000)));
-      coinBurst({ fromX: ox, fromY: oy, toX: tx, toY: ty, count, intense: crossed });
+      coinBurst({ fromX: ox, fromY: oy, toX: tx, toY: ty, count, intense: celebrate });
     }
     climbTo(target);
   }
@@ -481,18 +484,13 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
     const nextAns = { ...ans, [step.key]: value };
     setAns(nextAns); setErr(""); haptic([6, 16, 8]);
     track("funnel_step_complete", { step_number: i + 1, step_key: step.key, value });
-    // Plugin form-funnel mirror — maps CMA's step.key to the v1.html
-    // FormFunnelStepCatalog slot so the WP cah_form_funnel_events table sees
-    // a step_completed row keyed by canonical slug + step_number.
     trackStepCompleted(step.key);
-    // v1.html parity: push growformIframe.growformStepCompleted to dataLayer
-    // so the shared GTM container's step-funnel tags fire identically.
     const slot = CMA_STEP_TO_CATALOG[step.key];
     if (slot) {
       const answerLabel = step.options?.find((o) => o.value === value)?.label ?? value;
       pushStepCompleted(slot.step, slot.slug, answerLabel, nextAns);
     }
-    fireReward(ox, oy, nextAns, i + 1, step.key === "serviceType" || step.key === "injury");
+    fireReward(ox, oy, nextAns, i + 1, step.key === "serviceType" || step.key === "injury", step.key === "attorney");
     window.setTimeout(() => goTo(i + 1), 300);
   }
 
