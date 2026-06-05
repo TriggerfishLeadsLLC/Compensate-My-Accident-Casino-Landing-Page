@@ -97,7 +97,7 @@ export const STEPS: Step[] = [
   {
     key: "phone",
     kind: "phone",
-    heading: "Where should we send your full estimate?",
+    heading: "Final Step. What are your basic contact details?",
     sub: "Enter your number to unlock your full estimate and your free case review.",
   },
 ];

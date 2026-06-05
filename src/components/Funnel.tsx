@@ -169,7 +169,6 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
         window.setTimeout(() => setCombat((c) => (c && c.key === ckey ? null : c)), 1200);
       }
       if (crossed || big) { setShaking(true); window.setTimeout(() => setShaking(false), 520); }
-      if (crossed) shower(true);
       const el = document.getElementById("cma-value");
       const r = el?.getBoundingClientRect();
       const tx = r ? r.left + r.width / 2 : window.innerWidth / 2;
@@ -278,6 +277,11 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
     setAns(nextAns); setErr(""); haptic([6, 16, 8]);
     track("funnel_step_complete", { step_number: i + 1, step_key: step.key, value });
     fireReward(ox, oy, nextAns, i + 1, step.key === "serviceType" || step.key === "injury");
+    // Celebratory coin shower right after the lawyer question, on the transition to
+    // "Where did the accident happen?" — fires every time, independent of any value
+    // milestone. Coins sweep in from the sides and fall. HIGH-model flair only;
+    // shower() itself respects reduced-motion.
+    if (step.key === "attorney" && valueModel() === "high") shower(true, "sides");
     window.setTimeout(() => goTo(i + 1), 300);
   }
 
