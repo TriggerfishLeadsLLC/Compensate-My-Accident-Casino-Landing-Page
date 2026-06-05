@@ -5,7 +5,8 @@ import { STEPS, US_STATES, type Answers } from "@/lib/funnel";
 import { estimateRange, teaserValue, fmtUSD, valueModel } from "@/lib/estimate";
 import { track, trackLead, clarityTag } from "@/lib/analytics";
 import { readCahAttribution, type CahAttribution } from "@/lib/cahAttribution";
-import { trackFormView, trackStepCompleted, trackFormAbandon } from "@/lib/cahFormFunnel";
+import { trackFormView, trackStepCompleted, trackFormAbandon, catalogSlotForStepKey, CMA_STEP_TO_CATALOG } from "@/lib/cahFormFunnel";
+import { pushFormBoot, pushStepCompleted, pushFormSubmit, pushLeadStage, pushFormAbandonment } from "@/lib/cahV1DataLayer";
 import { coinBurst, shower, warmUp } from "@/lib/fx";
 import AccidentIcon from "@/components/AccidentIcon";
 import ValueHUD from "@/components/ValueHUD";
@@ -167,24 +168,29 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   useEffect(() => {
     if (submitted) return; // post-submit: describe useEffect owns the listeners
     let visibilityTimer: ReturnType<typeof setTimeout> | null = null;
-    const fireAbandon = () => {
+    const fireAbandon = (reason: string) => {
       if (abandonedRef.current || !startedRef.current || submitted) return;
       abandonedRef.current = true;
       const key = step?.key ?? "serviceType";
       trackFormAbandon(key);
+      // v1.html parity: push form_abandonment to dataLayer for GTM abandonment
+      // tags that dimension by step. Reason mirrors v1's gfTrackAbandonment
+      // reason values so abandon-reason dashboards see the same shape.
+      const slot = catalogSlotForStepKey(key);
+      if (slot) pushFormAbandonment(slot.step, slot.slug, reason);
     };
     const onVisChange = () => {
       if (document.visibilityState === "hidden") {
         // Defer — alt-tab / devtools / brief focus loss shouldn't count.
         if (visibilityTimer) clearTimeout(visibilityTimer);
-        visibilityTimer = setTimeout(fireAbandon, 30000);
+        visibilityTimer = setTimeout(() => fireAbandon("visibility_hidden_30s"), 30000);
       } else if (visibilityTimer) {
         // User returned within 30s — cancel the pending abandon.
         clearTimeout(visibilityTimer);
         visibilityTimer = null;
       }
     };
-    const onPagehide = () => fireAbandon();
+    const onPagehide = () => fireAbandon("pagehide");
     window.addEventListener("pagehide", onPagehide);
     document.addEventListener("visibilitychange", onVisChange);
     return () => {
@@ -230,6 +236,10 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       // cah_form_funnel_events table sees a denominator for variant 3's
       // step-completion percentages. Only fires once per page load.
       trackFormView();
+      // v1.html parity: push cah_form_boot to dataLayer so the shared GTM
+      // container (GTM-W9T5LS86) sees the same session-start signal it sees
+      // on v1 visitors. GTM Initialization-Trigger tags fire on this event.
+      pushFormBoot();
     }
   }, [i, step?.key, steps.length]);
 
@@ -345,6 +355,15 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
       destRef.current = `${data.redirect}?lead_stage=${data.stage}`;
       setSubmitted(true);
       trackLead(Boolean(data.qualified), { stage: data.stage }); // conversion fires HERE
+      // v1.html parity: push form_submit + lead_qualified/disqualified to the
+      // shared GTM container's dataLayer. form_submit is the canonical
+      // conversion event downstream tags (Meta CAPI, Google Ads enhanced
+      // conversion, Hyros) hook on; lead_<stage> lets stage-conditional ad
+      // tags (e.g. fire FB Lead only for qualified) target correctly. Stage
+      // prefix is "cma" so variant 3 leads are distinguishable from v1/v2 in
+      // the lead_stage field.
+      pushFormSubmit(ans, data.stage, "manual");
+      pushLeadStage(ans, data.stage, "cma");
       setBusy(false);
       setContactPhase("describe"); // reveal the optional "strengthen your case" step
     } catch {
@@ -433,6 +452,13 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
     // FormFunnelStepCatalog slot so the WP cah_form_funnel_events table sees
     // a step_completed row keyed by canonical slug + step_number.
     trackStepCompleted(step.key);
+    // v1.html parity: push growformIframe.growformStepCompleted to dataLayer
+    // so the shared GTM container's step-funnel tags fire identically.
+    const slot = CMA_STEP_TO_CATALOG[step.key];
+    if (slot) {
+      const answerLabel = step.options?.find((o) => o.value === value)?.label ?? value;
+      pushStepCompleted(slot.step, slot.slug, answerLabel, nextAns);
+    }
     fireReward(ox, oy, nextAns, i + 1, step.key === "serviceType" || step.key === "injury");
     window.setTimeout(() => goTo(i + 1), 300);
   }
@@ -460,9 +486,22 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
     // to step 11 (email) — matches v1.html's two-step PII collection so
     // Looker sees a comparable funnel shape across all three variants.
     if (step.kind === "phone") {
-      trackStepCompleted(contactPhase === "email" ? "email" : "phone");
+      const subKey = contactPhase === "email" ? "email" : "phone";
+      trackStepCompleted(subKey);
+      const slot = CMA_STEP_TO_CATALOG[subKey];
+      if (slot) {
+        const label = contactPhase === "email" ? (ans.email ?? "") : (ans.phone ?? "");
+        pushStepCompleted(slot.step, slot.slug, label, ans);
+      }
     } else {
       trackStepCompleted(step.key);
+      const slot = CMA_STEP_TO_CATALOG[step.key];
+      if (slot) {
+        let label = "";
+        if (step.kind === "state") label = ans.stateText ?? "";
+        else if (step.kind === "name") label = `${ans.firstName ?? ""} ${ans.lastName ?? ""}`.trim();
+        pushStepCompleted(slot.step, slot.slug, label, ans);
+      }
     }
     haptic(10);
     const ox = e?.clientX ?? window.innerWidth / 2;
