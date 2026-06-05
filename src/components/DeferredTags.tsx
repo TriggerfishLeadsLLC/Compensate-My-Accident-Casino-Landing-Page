@@ -35,6 +35,12 @@ export default function DeferredTags({ ga4, gtm, clarity }: { ga4?: string; gtm?
         w.gtag("config", ga4, { experiment_variant: w.cmaVariant });
       }
       inject("https://api.trustedform.com/trustedform.js?field=xxTrustedFormCertUrl&ping_field=xxTrustedFormPingUrl&l=" + new Date().getTime() + Math.random());
+      // Fraud Blocker (sid mirrors v1.html / caraccidenthelp.net so all three
+      // split-test variants feed the same FB account). Same 2s deferred slot
+      // as the other third-party tags — a sub-2s bounce misses fraud
+      // detection but real visitors (and bots that bother to interact past
+      // first paint) are covered.
+      inject("https://monitor.fraudblocker.com/fbt.js?sid=MRebIcZLSYP466uvLIA1V");
       if (gtm) {
         w.dataLayer = w.dataLayer || [];
         w.dataLayer.push({ "gtm.start": new Date().getTime(), event: "gtm.js" });
