@@ -390,7 +390,6 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   // 6-minute cron sweep finalizes the deferred row anyway.
   function finalize(useBeacon = false) {
     if (finalizedRef.current) return;
-    console.log(`[finalize] called: useBeacon=${useBeacon}, describeRef.current=${JSON.stringify(describeRef.current)}, stack=${new Error().stack?.split("\n").slice(1, 4).join(" <- ")}`);
     finalizedRef.current = true;
     if (inactivityRef.current) clearTimeout(inactivityRef.current);
     const attr = attributionRef.current;
@@ -432,7 +431,6 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   // weird divergence vs v1.html / v2.html in Looker comparisons.
   const describeFirstKeystrokeRef = useRef(false);
   function onDescribe(v: string) {
-    console.log(`[describe-typing] len=${v.length}, value=${JSON.stringify(v)}`);
     setDescribe(v);
     describeRef.current = v;
     if (describeFirstKeystrokeRef.current) return;
