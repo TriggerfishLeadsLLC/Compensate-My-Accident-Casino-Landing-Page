@@ -421,11 +421,22 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
     trackStepCompleted("describe");
   }
 
+  // Mirrors v1.html's gfHandleDescribeTyping (5-min timer, reset ONCE on
+  // first keystroke). Subsequent keystrokes don't extend — that's deliberate
+  // so an active typist can't hold the lead in deferred state indefinitely.
+  //
+  // Why not the original 30s-stop-typing pattern: post-accident audience
+  // often pauses for a long time mid-thought to describe what happened.
+  // 30s mid-pause finalisation submits half-written describes and creates
+  // weird divergence vs v1.html / v2.html in Looker comparisons.
+  const describeFirstKeystrokeRef = useRef(false);
   function onDescribe(v: string) {
     setDescribe(v);
     describeRef.current = v;
+    if (describeFirstKeystrokeRef.current) return;
+    describeFirstKeystrokeRef.current = true;
     if (inactivityRef.current) clearTimeout(inactivityRef.current);
-    inactivityRef.current = setTimeout(() => finalize(false), 30000); // ~30s stop-typing → send
+    inactivityRef.current = setTimeout(() => finalize(false), 5 * 60 * 1000); // 5 min after first keystroke
   }
 
   function seeResults() {
@@ -434,16 +445,23 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
     window.setTimeout(() => { window.location.href = destRef.current || "/thank-you"; }, 600);
   }
 
-  // Describe phase: finalize on abandon (page leave/hide) or a hard 5-min cap.
+  // Describe phase: 5-min finalize timer (matches v1.html's GF_FINAL_SUBMIT_MAX_MS).
+  // Armed on entry, reset ONCE on first keystroke (see onDescribe). pagehide /
+  // visibilitychange:hidden fire finalize immediately regardless — we always
+  // want the typed describe to land if the page is unloading.
+  //
+  // Sharing the inactivityRef timer slot with onDescribe so first-keystroke
+  // reset just resets the existing timer instead of racing two parallel ones.
   useEffect(() => {
     if (contactPhase !== "describe") return;
     const onHide = () => { if (document.visibilityState === "hidden") finalize(true); };
     const onLeave = () => finalize(true);
-    const cap = window.setTimeout(() => finalize(false), 5 * 60 * 1000);
+    if (inactivityRef.current) clearTimeout(inactivityRef.current);
+    inactivityRef.current = setTimeout(() => finalize(false), 5 * 60 * 1000);
     window.addEventListener("pagehide", onLeave);
     document.addEventListener("visibilitychange", onHide);
     return () => {
-      window.clearTimeout(cap);
+      if (inactivityRef.current) clearTimeout(inactivityRef.current);
       window.removeEventListener("pagehide", onLeave);
       document.removeEventListener("visibilitychange", onHide);
     };
