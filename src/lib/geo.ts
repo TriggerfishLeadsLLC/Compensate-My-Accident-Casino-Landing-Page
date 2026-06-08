@@ -22,6 +22,7 @@ export interface Geo {
   region: string;     // e.g. "FL"
   city: string;       // e.g. "Miami"
   stateName: string;  // e.g. "Florida" (US only)
+  postalCode: string; // e.g. "33101" (Vercel sets this from IP geolocation; empty on local dev / unrouted IPs)
 }
 
 export async function readGeo(): Promise<Geo> {
@@ -32,5 +33,6 @@ export async function readGeo(): Promise<Geo> {
   let city = "";
   try { city = decodeURIComponent(cityRaw); } catch { city = cityRaw; }
   const stateName = country === "US" ? STATE_NAMES[region] || "" : "";
-  return { region, city, stateName };
+  const postalCode = (h.get("x-vercel-ip-postal-code") || "").trim();
+  return { region, city, stateName, postalCode };
 }

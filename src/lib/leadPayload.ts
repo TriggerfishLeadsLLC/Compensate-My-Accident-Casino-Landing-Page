@@ -94,7 +94,7 @@ export function buildMakePayload(a: Answers, meta: LeadMeta) {
     buttons_26651153024883: f("Buttons", "Injury", "f50903b962cd3e784da5fc7c", lbl("injury", a.injury)),
     buttons_605863290008990: f("Buttons", "Accident Happen", "e0d68e97dccf6ad1863aa070", lbl("accidentHappen", a.accidentHappen)),
     single_select_726281422444697: f("Single Select", "State", "450c04c61e93dc39e1f46db6", a.stateText),
-    zipcode_708492827784848: f("Zipcode", "What is your zip code?", ZIP_STEP, a.zipcode),
+    zipcode_708492827784848: f("Zipcode", "What is your zip code?", ZIP_STEP, a.zipcode ?? ""),
     buttons_555677308875088: f("Buttons", "Insured", "7bd67752e688f5ce009f7f6b", lbl("insured", a.insured)),
     text_717042938246781: f("Text", "Briefly describe your accident to us.", "3dbad15e3fd9836d72981b16", a.describe ?? ""),
     text_921418548778799: f("Text", "First name", NAME_STEP, a.firstName),

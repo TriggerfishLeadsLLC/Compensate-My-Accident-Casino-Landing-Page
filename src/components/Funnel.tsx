@@ -31,10 +31,13 @@ function urgencyFor(a: Answers): string | null {
   return "✓ Good news: you're likely still within the filing window.";
 }
 
-export default function Funnel({ initialState = "", stateName = "", variant = "control" }: { initialState?: string; stateName?: string; variant?: string }) {
+export default function Funnel({ initialState = "", initialZip = "", stateName = "", variant = "control" }: { initialState?: string; initialZip?: string; stateName?: string; variant?: string }) {
   const v2 = variant === "optimized";
   const [i, setI] = useState(0);
-  const [ans, setAns] = useState<Answers>({ stateText: initialState || undefined });
+  const [ans, setAns] = useState<Answers>({
+    stateText: initialState || undefined,
+    zipcode: initialZip || undefined,
+  });
   const [tcpa, setTcpa] = useState(false);
   const [tcpaMiss, setTcpaMiss] = useState(false); // consent-missing spotlight (highlight + shake)
   const [contactPhase, setContactPhase] = useState<"phone" | "email" | "describe">("phone");
@@ -112,18 +115,26 @@ export default function Funnel({ initialState = "", stateName = "", variant = "c
   const progress = v2 ? Math.min(100, Math.round(18 + ((i + 1) / steps.length) * 82)) : Math.round(((i + 1) / steps.length) * 100);
   const range = useMemo(() => (ans.serviceType ? estimateRange(ans) : null), [ans]);
 
-  // Silent background ZIP + state from IP (best-effort). State is normally
-  // supplied by Vercel edge headers (x-vercel-ip-country-region → initialState
-  // prop) but those don't exist in local dev and can be intermittently absent
-  // through some proxies. ipapi.co's region field (full state name like
-  // "Texas") gives us a reliable second source — mirrors v1.html's behavior.
-  // Both fields use ` || ` so user input and existing initialState always win.
+  // Silent background ZIP + state. Three sources of truth, in order:
+  //   1. Vercel edge headers via initialState / initialZip props (most reliable
+  //      — set per-request on every Vercel deploy by the platform). These win
+  //      on mount via useState initialization above.
+  //   2. ipapi.co client-side fetch (fallback when Vercel headers were absent —
+  //      happens for non-US traffic, some mobile carriers, and local dev).
+  //   3. (No #3 — there is no visible zip step. v1.html has one; CMA chose to
+  //      skip it for UX speed. If both 1 and 2 miss, the lead submits with an
+  //      empty zip and the plugin's defensive default keeps the JSON key
+  //      present so downstream sees `value: ""` instead of a missing key.)
   //
-  // CMA has NO visible zipcode step (zip is silently auto-filled, then sent
-  // with the lead). For the plugin's form funnel we still want a step 7
-  // (zipcode) completion event so the catalog's per-step counts make sense
-  // — fire trackStepCompleted("zipcode") here when ipapi populates the zip.
-  // Mirrors v1.html's gfTrackAutoCompletedStep(7) for the same scenario.
+  // CMA has NO visible zipcode step. For the plugin's form funnel we still
+  // want a step 7 (zipcode) completion event so the catalog's per-step counts
+  // line up with v1.html's. Fire trackStepCompleted("zipcode") either at
+  // mount (if Vercel header populated it) or after ipapi resolves.
+  useEffect(() => {
+    if (initialZip) {
+      trackStepCompleted("zipcode");
+    }
+  }, [initialZip]);
   useEffect(() => {
     let done = false;
     (async () => {
