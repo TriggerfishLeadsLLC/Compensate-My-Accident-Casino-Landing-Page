@@ -34,8 +34,17 @@ export default async function FunnelPage({ variant }: { variant: "control" | "op
         </div>
       </div>
 
-      <input type="hidden" name="xxTrustedFormCertUrl" id="xxTrustedFormCertUrl" />
-      <input type="hidden" name="xxTrustedFormPingUrl" id="xxTrustedFormPingUrl" />
+      {/* TrustedForm only writes its cert URL into hidden fields that live inside a
+          real <form>. The funnel submits via fetch and renders no form of its own,
+          so these fields must sit in this dedicated wrapper — without it TF still
+          generates a certificate (we see the cert id + snapshot/events fire) but
+          never writes it back, and every lead ships with an empty
+          TrustedForm_certUrl. No submit control lives in here, so the form can't be
+          submitted; it exists purely so TF has a form to populate. */}
+      <form id="cma-tf-form" aria-hidden="true">
+        <input type="hidden" name="xxTrustedFormCertUrl" id="xxTrustedFormCertUrl" />
+        <input type="hidden" name="xxTrustedFormPingUrl" id="xxTrustedFormPingUrl" />
+      </form>
 
       <SiteFooter />
     </main>

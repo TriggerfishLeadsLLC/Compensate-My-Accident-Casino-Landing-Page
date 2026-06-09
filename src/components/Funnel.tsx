@@ -345,8 +345,11 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
     let trustedFormCert = "";
     try {
       new URLSearchParams(window.location.search).forEach((v, k) => (utms[k] = v));
-      const tf = document.querySelector<HTMLInputElement>('[name="xxTrustedFormCertUrl"]');
-      if (tf?.value) trustedFormCert = tf.value;
+      // TrustedForm may populate our hidden field or one it injects into the
+      // form, so take the first cert field that actually carries a value.
+      document.querySelectorAll<HTMLInputElement>('[name="xxTrustedFormCertUrl"]').forEach((el) => {
+        if (!trustedFormCert && el.value) trustedFormCert = el.value;
+      });
       sessionStorage.setItem("cma_estimate", JSON.stringify(estimateRange(submitAnswers)));
     } catch {}
     // Cache utms + trustedFormCert + attribution so finalize() can rebuild the
