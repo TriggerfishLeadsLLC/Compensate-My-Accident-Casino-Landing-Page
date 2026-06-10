@@ -40,10 +40,19 @@ export default async function FunnelPage({ variant }: { variant: "control" | "op
           generates a certificate (we see the cert id + snapshot/events fire) but
           never writes it back, and every lead ships with an empty
           TrustedForm_certUrl. No submit control lives in here, so the form can't be
-          submitted; it exists purely so TF has a form to populate. */}
+          submitted; it exists purely so TF has a form to populate.
+
+          The email/phone mirrors below are always-mounted so TrustedForm scans the
+          lead's PII into the cert even on the Trestle auto-skip path, where the
+          email is resolved from the phone and the visible email step never renders
+          (so the email otherwise never reaches the DOM). Buyers reject those leads
+          with boberdoo #1018 / email_match:false. Funnel.doSubmit populates these
+          (value + attribute) for every submit path. */}
       <form id="cma-tf-form" aria-hidden="true">
         <input type="hidden" name="xxTrustedFormCertUrl" id="xxTrustedFormCertUrl" />
         <input type="hidden" name="xxTrustedFormPingUrl" id="xxTrustedFormPingUrl" />
+        <input type="hidden" name="email" id="cma-tf-email" />
+        <input type="hidden" name="phone" id="cma-tf-phone" />
       </form>
 
       <SiteFooter />

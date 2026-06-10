@@ -350,6 +350,20 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
       document.querySelectorAll<HTMLInputElement>('[name="xxTrustedFormCertUrl"]').forEach((el) => {
         if (!trustedFormCert && el.value) trustedFormCert = el.value;
       });
+      // Mirror the lead's email/phone into the always-mounted hidden fields at the
+      // page root so TrustedForm captures them in the cert on every path. Critical
+      // for the Trestle auto-skip (l.559): there the email is resolved from the
+      // phone and the visible email step never renders, so the email never reaches
+      // the DOM and the cert lands email_match:false — buyers then reject the lead
+      // (boberdoo #1018). Set the attribute too (not just the property) so TF's DOM
+      // snapshot serializes the value. The page stays open through the describe
+      // phase, giving TF time to scan before the cert is claimed downstream.
+      const mirrorTf = (id: string, val: string) => {
+        const el = document.getElementById(id) as HTMLInputElement | null;
+        if (el && val) { el.value = val; el.setAttribute("value", val); }
+      };
+      mirrorTf("cma-tf-email", submitAnswers.email ?? "");
+      mirrorTf("cma-tf-phone", submitAnswers.phone ?? "");
       sessionStorage.setItem("cma_estimate", JSON.stringify(estimateRange(submitAnswers)));
     } catch {}
     // Cache utms + trustedFormCert + attribution so finalize() can rebuild the
