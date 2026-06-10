@@ -14,6 +14,11 @@ interface Body {
   answers?: Answers;
   utms?: Record<string, string>;
   trustedFormCert?: string;
+  // Mirror of v1.html's gfTrestle.email — populated when /api/enrich
+  // returned an email for the phone number. Threaded through to
+  // buildMakePayload so the make_payload's trestle_email audit field
+  // matches what Trestle resolved. Empty string when Trestle missed.
+  trestleEmail?: string;
   attribution?: Attribution;
   landingUrl?: string;
 }
@@ -57,6 +62,7 @@ export async function POST(req: Request) {
     ip,
     userAgent: req.headers.get("user-agent") ?? "",
     trustedFormCert: body.trustedFormCert,
+    trestleEmail: body.trestleEmail,
     eventId,
   });
 

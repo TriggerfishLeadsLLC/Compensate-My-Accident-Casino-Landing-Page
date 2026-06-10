@@ -14,13 +14,15 @@ interface Body {
   eventId?: string;
   leadId?: number | null;
   describe?: string;
-  // Full answers + utms + trustedFormCert so we can rebuild the make_payload
-  // with the user's just-typed describe text. Threading these from the client
-  // keeps the route stateless — the plugin sees the full final payload and
-  // dispatches to Make in one shot.
+  // Full answers + utms + trustedFormCert + trestleEmail so we can rebuild the
+  // make_payload with the user's just-typed describe text. Threading these
+  // from the client keeps the route stateless — the plugin sees the full
+  // final payload and dispatches to Make in one shot. trestleEmail mirrors
+  // v1.html's gfTrestle.email and populates the trestle_email audit field.
   answers?: Answers;
   utms?: Record<string, string>;
   trustedFormCert?: string;
+  trestleEmail?: string;
   attribution?: Attribution;
 }
 
@@ -68,6 +70,7 @@ export async function POST(req: Request) {
     ip,
     userAgent: req.headers.get("user-agent") ?? "",
     trustedFormCert: body.trustedFormCert,
+    trestleEmail: body.trestleEmail,
     eventId: body.eventId ?? "",
   });
 

@@ -67,6 +67,12 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
   const leadIdRef = useRef<number | null>(null);
   const utmsRef = useRef<Record<string, string>>({});
   const trustedFormCertRef = useRef("");
+  // Stash the Trestle-resolved email so we can mirror it into the
+  // `trestle_email` audit field in make_payload (mirrors v1.html's
+  // gfTrestle.email). Downstream uses this to distinguish leads where
+  // Trestle filled the email vs leads where the user typed it manually.
+  // Stays empty when Trestle missed or was never called.
+  const trestleEmailRef = useRef("");
   // Fire-once guard for form_abandon. pagehide AND visibilitychange:hidden
   // both fire on a real tab close (browser behavior), so without this guard
   // we'd POST two abandon events for one user. Once set, stays set for the
@@ -381,6 +387,7 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
           answers: submitAnswers,
           utms,
           trustedFormCert,
+          trestleEmail: trestleEmailRef.current,
           attribution: attribution ? {
             testId: attribution.testId,
             variantId: attribution.variantId,
@@ -435,6 +442,7 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
       answers: { ...ans, describe: describeRef.current },
       utms: utmsRef.current,
       trustedFormCert: trustedFormCertRef.current,
+      trestleEmail: trestleEmailRef.current,
       attribution: attr ? {
         testId: attr.testId,
         variantId: attr.variantId,
@@ -585,6 +593,10 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
           // it sees the Trestle email without waiting for the setAns React
           // state update to land. React batches state updates between renders,
           // so an await doSubmit() right after setAns reads stale `ans`.
+          // Stash the Trestle email separately so the make_payload's
+          // trestle_email audit field is populated (mirrors v1.html which
+          // sources it from gfTrestle.email — empty when Trestle missed).
+          trestleEmailRef.current = String(d.email);
           const merged: Answers = { ...ans, email: d.email };
           setAns(merged);
           trackStepCompleted("email");
