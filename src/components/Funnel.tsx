@@ -136,15 +136,18 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
   //      empty zip and the plugin's defensive default keeps the JSON key
   //      present so downstream sees `value: ""` instead of a missing key.)
   //
-  // CMA has NO visible zipcode step. For the plugin's form funnel we still
-  // want a step 7 (zipcode) completion event so the catalog's per-step counts
-  // line up with v1.html's. Fire trackStepCompleted("zipcode") either at
-  // mount (if Vercel header populated it) or after ipapi resolves.
-  useEffect(() => {
-    if (initialZip) {
-      trackStepCompleted("zipcode");
-    }
-  }, [initialZip]);
+  // The plugin form-funnel "zipcode" (catalog step 7) completion event is
+  // fired once per user when they complete the state step in onContinue()
+  // below — NOT here on auto-fill. Firing on every successful auto-fill
+  // (Vercel edge header OR ipapi.co) over-counted by ~10x because nearly
+  // every visitor gets a zip resolved regardless of whether they progress
+  // through the form. The 2026-06-10 dashboard surfaced this as 656 zip
+  // events vs only 70 state-step completers — a 937% "completion rate" on
+  // step 7 that cascaded into broken Totals for steps 8 (Insured) and 9
+  // (Name). Firing once at state-step completion mirrors v1.html's
+  // gfTrackAutoCompletedStep(7) (which v1.html fires when the user lands
+  // on its visible zip step — CMA has no visible zip step so state is the
+  // closest equivalent in catalog order).
   useEffect(() => {
     let done = false;
     (async () => {
@@ -152,19 +155,16 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
         const r = await fetch("https://ipapi.co/json/");
         if (!r.ok || done) return;
         const d = (await r.json()) as { postal?: string; region?: string; country_code?: string };
-        let zipApplied = false;
         setAns((a) => {
           const next = { ...a };
           if (d.postal && !a.zipcode) {
             next.zipcode = String(d.postal);
-            zipApplied = true;
           }
           if (d.region && !a.stateText && (d.country_code ?? "US").toUpperCase() === "US") {
             next.stateText = String(d.region);
           }
           return next;
         });
-        if (zipApplied) trackStepCompleted("zipcode");
       } catch {}
     })();
     return () => { done = true; };
@@ -607,6 +607,17 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
         if (step.kind === "state") label = ans.stateText ?? "";
         else if (step.kind === "name") label = `${ans.firstName ?? ""} ${ans.lastName ?? ""}`.trim();
         pushStepCompleted(slot.step, slot.slug, label, ans);
+      }
+      // CMA has no visible zip step (auto-filled silently from the Vercel
+      // edge header / ipapi.co). Fire the catalog step 7 (zipcode) completion
+      // event once when the user completes state, so the dashboard's per-step
+      // chain math works: step 7 Total = step 6 (state) Completions, and
+      // step 7 Completions = same number (every state-completer effectively
+      // passed through zip in v1.html order terms). Replaces the previous
+      // on-auto-fill firing in the useEffect above, which over-counted ~10x
+      // by firing on every page-load zip resolution regardless of progress.
+      if (step.key === "stateText") {
+        trackStepCompleted("zipcode");
       }
     }
     haptic(10);
