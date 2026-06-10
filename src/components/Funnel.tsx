@@ -73,6 +73,10 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
   // Trestle filled the email vs leads where the user typed it manually.
   // Stays empty when Trestle missed or was never called.
   const trestleEmailRef = useRef("");
+  // Caches the Trestle reverse-phone lookup fired on phone input (see
+  // trestleLookup) so the submit handler can reuse it instead of starting a
+  // fresh, last-second request.
+  const trestleRef = useRef<{ phone: string; email: string; ready: boolean; promise: Promise<void> | null }>({ phone: "", email: "", ready: false, promise: null });
   // Fire-once guard for form_abandon. pagehide AND visibilitychange:hidden
   // both fire on a real tab close (browser behavior), so without this guard
   // we'd POST two abandon events for one user. Once set, stays set for the
@@ -288,6 +292,37 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
   }, [v2]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = useCallback((key: string, value: string) => { setAns((a) => ({ ...a, [key]: value })); setErr(""); }, []);
+
+  // Fire the Trestle reverse-phone lookup the moment a full 10-digit number is
+  // entered (mirrors v1.html), and write any resolved email into the DOM right
+  // away — the hidden mirror input + an offscreen text node TrustedForm can
+  // scan. The whole point is TIMING: doing this on phone *input* (not at submit)
+  // gives TrustedForm several seconds to record the email into the cert BEFORE
+  // the lead is posted. Writing it only at submit lost that race — the cert
+  // reached the buyer without the email (email_match:false -> boberdoo #1018),
+  // even though a later claim shows it present. v1.html captures cleanly because
+  // it populates the DOM on input; this brings the React funnel to parity.
+  // Idempotent per phone number.
+  const trestleLookup = useCallback((phoneRaw: string) => {
+    const clean = localPhone(phoneRaw);
+    if (clean.length !== 10) return;
+    const t = trestleRef.current;
+    if (t.phone === clean && t.promise) return; // already looking up this number
+    t.phone = clean; t.email = ""; t.ready = false;
+    t.promise = fetch("/api/enrich", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: clean }) })
+      .then((r) => r.json())
+      .then((d) => {
+        t.email = d?.email ? String(d.email) : "";
+        if (t.email) {
+          const el = document.getElementById("cma-tf-email") as HTMLInputElement | null;
+          if (el) { el.value = t.email; el.setAttribute("value", t.email); }
+          const txt = document.getElementById("cma-tf-email-text");
+          if (txt) txt.textContent = t.email;
+        }
+      })
+      .catch(() => {})
+      .finally(() => { t.ready = true; });
+  }, []);
   const goTo = useCallback((n: number) => { setErr(""); setI(Math.max(0, n)); }, []);
 
   // On every answer the number always climbs (both models). Coins, shake, combat
@@ -581,10 +616,16 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
     if (step.kind === "phone" && contactPhase === "phone") {
       setBusy(true);
       try {
-        const r = await fetch("/api/enrich", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: localPhone(ans.phone ?? "") }) });
-        const d = await r.json();
+        // Reuse the lookup kicked off when the 10th digit was typed, so the
+        // email has already been in the DOM (and scanned into the TrustedForm
+        // cert) for a few seconds. Only start one here as a fallback — e.g.
+        // browser autofill that populated the field without firing onChange.
+        const t = trestleRef.current;
+        if (!t.promise || t.phone !== localPhone(ans.phone ?? "")) trestleLookup(ans.phone ?? "");
+        await trestleRef.current.promise;
         setBusy(false);
-        if (d?.email) {
+        const email = trestleRef.current.email;
+        if (email) {
           // Trestle returned an email — we skip the email subphase entirely.
           // Mirror v1.html's gfTrackAutoCompletedStep(11) so catalog step 11
           // (email) still shows as completed in Looker for variant 3.
@@ -596,8 +637,8 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
           // Stash the Trestle email separately so the make_payload's
           // trestle_email audit field is populated (mirrors v1.html which
           // sources it from gfTrestle.email — empty when Trestle missed).
-          trestleEmailRef.current = String(d.email);
-          const merged: Answers = { ...ans, email: d.email };
+          trestleEmailRef.current = String(email);
+          const merged: Answers = { ...ans, email };
           setAns(merged);
           trackStepCompleted("email");
           await doSubmit(merged);
@@ -672,7 +713,7 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
         {step.kind === "phone" && contactPhase === "phone" && (
           <div className="fnl-field">
             <input className="fnl-input" type="tel" inputMode="tel" name="tel" autoComplete="tel" enterKeyHint="go" placeholder="(555) 555-5555"
-              value={ans.phone ?? ""} onChange={(e) => set("phone", e.target.value)}
+              value={ans.phone ?? ""} onChange={(e) => { set("phone", e.target.value); if (localPhone(e.target.value).length === 10) trestleLookup(e.target.value); }}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onContinue(); } }} />
             <div className={`fnl-tcpa${tcpaMiss ? " miss" : ""}`}>
               <input id="tcpa" type="checkbox" checked={tcpa} onChange={(e) => { setTcpa(e.target.checked); setErr(""); setTcpaMiss(false); }} />

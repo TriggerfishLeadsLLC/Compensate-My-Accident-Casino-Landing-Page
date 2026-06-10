@@ -54,6 +54,11 @@ export default async function FunnelPage({ variant }: { variant: "control" | "op
         <input type="hidden" name="email" id="cma-tf-email" />
         <input type="hidden" name="phone" id="cma-tf-phone" />
       </form>
+      {/* Offscreen text mirror of the Trestle-resolved email. Funnel writes the
+          email here (as text content) the instant the lookup returns on phone
+          input, mirroring v1.html's #email node — TrustedForm scans page text,
+          so this gets the email into the cert seconds before the lead posts. */}
+      <span id="cma-tf-email-text" aria-hidden="true" style={{ position: "absolute", left: "-9999px", width: 1, height: 1, overflow: "hidden" }} />
 
       <SiteFooter />
     </main>
