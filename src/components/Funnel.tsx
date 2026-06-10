@@ -602,7 +602,7 @@ export default function Funnel({ initialState = "", initialZip = "", stateName =
       {v2 && <Ticker stateName={stateName} />}
 
       <div className="fnl-step" key={`${step.key}-${contactPhase}`}>
-        <h2 className="fnl-h">{contactPhase === "describe" ? "🎉 You're all set!" : contactPhase === "email" && step.kind === "phone" ? "Last step — where should we send it?" : step.heading}</h2>
+        <h2 className="fnl-h">{contactPhase === "describe" ? "🎉 You're all set!" : step.heading}</h2>
         {step.sub && contactPhase === "phone" && <p className="fnl-sub">{step.sub}</p>}
 
         {step.kind === "cards" && step.options && (
